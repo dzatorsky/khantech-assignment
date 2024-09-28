@@ -2,7 +2,7 @@ CREATE TABLE "user"
 (
     id   UUID    NOT NULL,
     name VARCHAR NOT NULL,
-    CONSTRAINT pk_userentity PRIMARY KEY (id)
+    CONSTRAINT pk_user PRIMARY KEY (id)
 );
 
 -------------------------------------------------------
@@ -13,7 +13,8 @@ CREATE TABLE wallet
     user_id  UUID           NOT NULL,
     currency VARCHAR(3)     NOT NULL,
     balance  DECIMAL(19, 2) NOT NULL,
-    CONSTRAINT pk_walletentity PRIMARY KEY (id)
+    CONSTRAINT pk_wallet PRIMARY KEY (id),
+    CONSTRAINT check_positive_balance CHECK (balance >= 0)
 );
 
 ALTER TABLE wallet
@@ -28,7 +29,7 @@ CREATE TABLE transaction
     id             UUID           NOT NULL,
     user_id        UUID           NOT NULL,
     wallet_id      UUID           NOT NULL,
-    amount         DECIMAL(19, 2) NOT NULL,
+    amount         DECIMAL(19, 2) NOT NULL CHECK (amount > 0),
     balance_before DECIMAL(19, 2) NOT NULL,
     balance_after  DECIMAL(19, 2) NOT NULL,
     type           VARCHAR(255)   NOT NULL,

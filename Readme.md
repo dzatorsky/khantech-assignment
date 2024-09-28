@@ -76,5 +76,3 @@ The challenge lies in processing the transactions according to specific business
 Prerequisites to run the solution:
    1. Java 23
    2. Docker (for integration tests using test containers)
-
-JPA relations (@OneToMany, @OneToOne, etc) between entities are not used intentionally. Today it's more an antipattern than pattern

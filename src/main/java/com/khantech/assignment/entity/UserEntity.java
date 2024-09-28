@@ -11,7 +11,7 @@ import java.util.UUID;
 @Getter
 @Setter
 @Entity
-@Table(name = "user")
+@Table(name = "`user`")
 @Accessors(chain = true)
 public class UserEntity {
     @Id
