@@ -32,7 +32,7 @@ public class WalletService {
 
         this.walletRepository
                 .findByUserIdAndCurrency(dto.getUserId(), dto.getCurrency())
-                .ifPresent(wallet -> {
+                .ifPresent(_ -> {
                     throw new WalletAlreadyExistsException(dto.getUserId(), dto.getCurrency());
                 });
 

@@ -1,8 +1,8 @@
 package com.khantech.assignment.controller;
 
-import com.khantech.assignment.dto.CreateWalletDTO;
-import com.khantech.assignment.dto.WalletDTO;
-import com.khantech.assignment.service.WalletService;
+import com.khantech.assignment.dto.CreateUserDTO;
+import com.khantech.assignment.dto.UserDTO;
+import com.khantech.assignment.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,16 +15,16 @@ import org.springframework.web.bind.annotation.RestController;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/wallets")
+@RequestMapping("/api/users")
 @RequiredArgsConstructor
-public class WalletController {
+public class UserController {
 
-    private final WalletService walletService;
+    private final UserService userService;
 
     @PostMapping
-    public ResponseEntity<WalletDTO> createWallet(@Valid @RequestBody CreateWalletDTO dto) {
-        WalletDTO walletDTO = walletService.createWallet(dto);
-        return new ResponseEntity<>(walletDTO, HttpStatus.CREATED);
+    public ResponseEntity<UserDTO> createUser(@Valid @RequestBody CreateUserDTO dto) {
+        UserDTO createdUser = userService.createUser(dto);
+        return new ResponseEntity<>(createdUser, HttpStatus.CREATED);
     }
 
 }

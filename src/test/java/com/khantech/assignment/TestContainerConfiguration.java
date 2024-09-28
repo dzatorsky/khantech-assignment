@@ -13,11 +13,11 @@ import org.testcontainers.containers.output.Slf4jLogConsumer;
 
 @Slf4j
 @TestConfiguration(proxyBeanMethods = false)
-class TestContainerConfiguration {
+public class TestContainerConfiguration {
 
     @Bean
     @ServiceConnection(name = "khantech-db")
-    PostgreSQLContainer<?> postgreSQLContainer() {
+    public PostgreSQLContainer<?> postgreSQLContainer() {
         return new PostgreSQLContainer<>("postgres:17-alpine")
                 .withDatabaseName("khantech")
                 .withUsername("khantech")

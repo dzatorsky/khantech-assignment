@@ -31,7 +31,6 @@ public class CommonErrorHandler extends ResponseEntityExceptionHandler {
                 .setCode(e.getCode())
                 .setMessage(e.getMessage())
                 .setStatus(e.getStatus().value())
-                .setDetails(e.getDetails())
                 .setTime(e.getTime() == null ? Instant.now() : e.getTime());
 
         return ResponseEntity
@@ -47,7 +46,6 @@ public class CommonErrorHandler extends ResponseEntityExceptionHandler {
         CommonErrorResponse unknownError = new CommonErrorResponse()
                 .setCode("common.error.unknown")
                 .setMessage("Unknown error. Please try again later.")
-                .setDetails(e.getClass().getSimpleName() + ": " + e.getMessage())
                 .setTime(Instant.now())
                 .setStatus(HttpStatus.INTERNAL_SERVER_ERROR.value());
 
@@ -81,7 +79,6 @@ public class CommonErrorHandler extends ResponseEntityExceptionHandler {
                 .setCode("common.error.invalid-argument")
                 .setMessage("The following fields are not valid: " + invalidFieldNames)
                 .setStatus(status.value())
-                .setDetails(ex.getClass().getSimpleName() + ": " + ex.getMessage())
                 .setTime(Instant.now())
                 .setValidationErrors(validationErrors);
 
@@ -99,7 +96,6 @@ public class CommonErrorHandler extends ResponseEntityExceptionHandler {
         CommonErrorResponse errorResponse = new CommonErrorResponse()
                 .setCode("common.error.not-found")
                 .setMessage(ex.getMessage())
-                .setDetails(ex.getClass().getSimpleName() + ": " + ex.getMessage())
                 .setTime(Instant.now())
                 .setStatus(status.value());
 
@@ -123,7 +119,6 @@ public class CommonErrorHandler extends ResponseEntityExceptionHandler {
             CommonErrorResponse errorResponse = new CommonErrorResponse()
                     .setCode(getErrorCode(statusCode))
                     .setMessage(ex.getMessage())
-                    .setDetails(ex.getCause() == null ? null : ex.getCause().getMessage())
                     .setTime(Instant.now())
                     .setStatus(status.value());
 

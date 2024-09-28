@@ -22,9 +22,10 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -63,7 +64,7 @@ class WalletControllerTest {
     }
 
     @Test
-    @DisplayName("Test successful wallet creation")
+    @DisplayName("Should create wallet when all conditions are met")
     void testCreateWalletSuccess() throws Exception {
         CreateWalletDTO createDTO = new CreateWalletDTO();
         createDTO.setUserId(testUser.getId());
@@ -90,7 +91,7 @@ class WalletControllerTest {
     }
 
     @Test
-    @DisplayName("Test that wallet is not created when the user doesn't exist")
+    @DisplayName("Should not create wallet when the user doesn't exist")
     void testCreateWalletUserNotFound() throws Exception {
         CreateWalletDTO createWalletDTO = new CreateWalletDTO();
         createWalletDTO.setUserId(UUID.randomUUID()); // Non-existent user ID
@@ -105,7 +106,7 @@ class WalletControllerTest {
     }
 
     @Test
-    @DisplayName("Test that wallet creation rejected when the wallet already exist for a given user and currency")
+    @DisplayName("Should not create a wallet if it already exists for a given userId and currency combination")
     void testCreateWalletWalletAlreadyExists() throws Exception {
         WalletEntity existingWallet = new WalletEntity();
         existingWallet.setUser(testUser);
@@ -120,8 +121,42 @@ class WalletControllerTest {
         mockMvc.perform(post("/api/wallets")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createWalletDTO)))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isConflict());
 
+    }
+
+    @Test
+    @DisplayName("Should not create wallet when request validation fails")
+    void testCreateWalletValidation() throws Exception {
+        CreateWalletDTO createWalletDTO = new CreateWalletDTO();
+
+        // currency is blank
+        createWalletDTO.setUserId(testUser.getId());
+        createWalletDTO.setCurrency("");
+        mockMvc.perform(post("/api/wallets")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createWalletDTO)))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.validationErrors", hasSize(1)))
+                .andExpect(jsonPath("$.validationErrors[0].field").value("currency"))
+                .andExpect(jsonPath("$.validationErrors[0].message").value("must not be blank"))
+                .andExpect(jsonPath("$.validationErrors[0].rejectedValue").value(""));
+
+        // Null userId
+        createWalletDTO.setCurrency("USD");
+        createWalletDTO.setUserId(null);
+        mockMvc.perform(post("/api/wallets")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createWalletDTO)))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.validationErrors", hasSize(1)))
+                .andExpect(jsonPath("$.validationErrors[0].field").value("userId"))
+                .andExpect(jsonPath("$.validationErrors[0].message").value("must not be null"))
+                .andExpect(jsonPath("$.validationErrors[0].rejectedValue").isEmpty());
+
+        assertThat(walletRepository.findAll()).isEmpty();
     }
 
 }

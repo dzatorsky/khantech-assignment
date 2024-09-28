@@ -14,13 +14,10 @@ CREATE TABLE wallet
     currency VARCHAR(3)     NOT NULL,
     balance  DECIMAL(19, 2) NOT NULL,
     CONSTRAINT pk_wallet PRIMARY KEY (id),
-    CONSTRAINT check_positive_balance CHECK (balance >= 0)
+    CONSTRAINT balance_positive_value CHECK (balance >= 0),
+    CONSTRAINT fk_wallet_user FOREIGN KEY (user_id) REFERENCES "user" (id),
+    CONSTRAINT uix_user_currency UNIQUE (user_id, currency)
 );
-
-ALTER TABLE wallet
-    ADD CONSTRAINT fk_wallet_user
-        FOREIGN KEY (user_id)
-            REFERENCES "user" (id);
 
 -------------------------------------------------------
 
@@ -35,15 +32,7 @@ CREATE TABLE transaction
     type           VARCHAR(255)   NOT NULL,
     status         VARCHAR(255)   NOT NULL,
     created_at     TIMESTAMP WITHOUT TIME ZONE,
-    CONSTRAINT pk_transaction PRIMARY KEY (id)
+    CONSTRAINT pk_transaction PRIMARY KEY (id),
+    CONSTRAINT fk_transaction_user FOREIGN KEY (user_id) REFERENCES "user" (id),
+    CONSTRAINT fk_transaction_wallet FOREIGN KEY (wallet_id) REFERENCES "wallet" (id)
 );
-
-ALTER TABLE transaction
-    ADD CONSTRAINT fk_transaction_user
-        FOREIGN KEY (user_id)
-            REFERENCES "user" (id);
-
-ALTER TABLE transaction
-    ADD CONSTRAINT fk_transaction_wallet
-        FOREIGN KEY (wallet_id)
-            REFERENCES wallet (id);
