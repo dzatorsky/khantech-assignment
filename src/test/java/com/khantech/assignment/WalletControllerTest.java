@@ -2,14 +2,20 @@ package com.khantech.assignment;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.khantech.assignment.dto.CreateWalletDTO;
+import com.khantech.assignment.dto.SubmitTransactionDTO;
+import com.khantech.assignment.dto.TransactionDTO;
 import com.khantech.assignment.dto.WalletDTO;
+import com.khantech.assignment.entity.TransactionEntity;
 import com.khantech.assignment.entity.UserEntity;
 import com.khantech.assignment.entity.WalletEntity;
+import com.khantech.assignment.enums.TransactionStatus;
+import com.khantech.assignment.enums.TransactionType;
 import com.khantech.assignment.repository.TransactionRepository;
 import com.khantech.assignment.repository.UserRepository;
 import com.khantech.assignment.repository.WalletRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -25,7 +31,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -58,105 +63,224 @@ class WalletControllerTest {
         walletRepository.deleteAll();
         userRepository.deleteAll();
 
-        this.testUser = new UserEntity();
-        this.testUser.setName(TEST_USER_NAME);
-        this.testUser = userRepository.save(testUser);
+        testUser = new UserEntity();
+        testUser.setName(TEST_USER_NAME);
+
+        userRepository.save(testUser);
     }
 
-    @Test
-    @DisplayName("Should create wallet when all conditions are met")
-    void testCreateWalletSuccess() throws Exception {
-        CreateWalletDTO createDTO = new CreateWalletDTO();
-        createDTO.setUserId(testUser.getId());
-        createDTO.setCurrency(TEST_CURRENCY);
-        String jsonResp = mockMvc.perform(post("/api/wallets")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(createDTO)))
-                .andExpect(status().isCreated())
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andReturn().getResponse().getContentAsString();
+    @Nested
+    @DisplayName("API endpoint for wallet creation")
+    class TestWalletCreation {
 
-        assertThat(walletRepository.findAll()).hasSize(1);
+        @Test
+        @DisplayName("Should create wallet when all conditions are met")
+        void testCreateWalletSuccess() throws Exception {
+            CreateWalletDTO createDTO = new CreateWalletDTO();
+            createDTO.setUserId(testUser.getId());
+            createDTO.setCurrency(TEST_CURRENCY);
 
-        WalletDTO walletDTO = objectMapper.readValue(jsonResp, WalletDTO.class);
-        assertThat(walletDTO.getId()).isNotNull();
-        assertThat(walletDTO.getUserId()).isEqualByComparingTo(testUser.getId());
-        assertThat(walletDTO.getCurrency()).isEqualTo(TEST_CURRENCY);
-        assertThat(walletDTO.getBalance()).isEqualByComparingTo(BigDecimal.ZERO);
+            String jsonResp = mockMvc.perform(post("/api/wallets")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(createDTO)))
+                    .andExpect(status().isCreated())
+                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                    .andReturn().getResponse().getContentAsString();
 
-        WalletEntity walletInDB = walletRepository.findAll().getFirst();
-        assertThat(walletInDB.getUser().getId()).isEqualByComparingTo(testUser.getId());
-        assertThat(walletInDB.getCurrency()).isEqualTo(TEST_CURRENCY);
-        assertThat(walletInDB.getBalance()).isEqualByComparingTo(BigDecimal.ZERO);
+            assertThat(walletRepository.findAll()).hasSize(1);
+
+            WalletDTO walletDTO = objectMapper.readValue(jsonResp, WalletDTO.class);
+            assertThat(walletDTO.getId()).isNotNull();
+            assertThat(walletDTO.getUserId()).isEqualByComparingTo(testUser.getId());
+            assertThat(walletDTO.getCurrency()).isEqualTo(TEST_CURRENCY);
+            assertThat(walletDTO.getBalance()).isEqualByComparingTo(BigDecimal.ZERO);
+
+            WalletEntity walletInDB = walletRepository.findAll().getFirst();
+            assertThat(walletInDB.getUser().getId()).isEqualByComparingTo(testUser.getId());
+            assertThat(walletInDB.getCurrency()).isEqualTo(TEST_CURRENCY);
+            assertThat(walletInDB.getBalance()).isEqualByComparingTo(BigDecimal.ZERO);
+        }
+
+        @Test
+        @DisplayName("Should not create wallet when the user doesn't exist")
+        void testCreateWalletUserNotFound() throws Exception {
+            CreateWalletDTO createWalletDTO = new CreateWalletDTO();
+            createWalletDTO.setUserId(UUID.randomUUID()); // Non-existent user ID
+            createWalletDTO.setCurrency(TEST_CURRENCY);
+
+            mockMvc.perform(post("/api/wallets")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(createWalletDTO)))
+                    .andExpect(status().isNotFound());
+
+            assertThat(walletRepository.findAll()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Should not create a wallet if it already exists for a given userId and currency combination")
+        void testCreateWalletWalletAlreadyExists() throws Exception {
+            WalletEntity existingWallet = new WalletEntity();
+            existingWallet.setUser(testUser);
+            existingWallet.setCurrency(TEST_CURRENCY);
+            existingWallet.setBalance(BigDecimal.valueOf(10000L));
+            walletRepository.save(existingWallet);
+
+            CreateWalletDTO createWalletDTO = new CreateWalletDTO();
+            createWalletDTO.setUserId(testUser.getId());
+            createWalletDTO.setCurrency(TEST_CURRENCY);
+
+            mockMvc.perform(post("/api/wallets")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(createWalletDTO)))
+                    .andExpect(status().isConflict());
+        }
+
+        @Test
+        @DisplayName("Should not create wallet when request validation fails")
+        void testCreateWalletValidation() throws Exception {
+            CreateWalletDTO createWalletDTO = new CreateWalletDTO();
+
+            // Currency is blank
+            createWalletDTO.setCurrency("");
+            createWalletDTO.setUserId(testUser.getId());
+            mockMvc.perform(post("/api/wallets")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(createWalletDTO)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(jsonPath("$.validationErrors", hasSize(1)))
+                    .andExpect(jsonPath("$.validationErrors[0].field").value("currency"))
+                    .andExpect(jsonPath("$.validationErrors[0].message").value("must not be blank"))
+                    .andExpect(jsonPath("$.validationErrors[0].rejectedValue").value(""));
+
+            // Null userId
+            createWalletDTO.setUserId(null);
+            createWalletDTO.setCurrency("USD");
+            mockMvc.perform(post("/api/wallets")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(createWalletDTO)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(jsonPath("$.validationErrors", hasSize(1)))
+                    .andExpect(jsonPath("$.validationErrors[0].field").value("userId"))
+                    .andExpect(jsonPath("$.validationErrors[0].message").value("must not be null"))
+                    .andExpect(jsonPath("$.validationErrors[0].rejectedValue").isEmpty());
+
+            assertThat(walletRepository.findAll()).isEmpty();
+        }
     }
 
-    @Test
-    @DisplayName("Should not create wallet when the user doesn't exist")
-    void testCreateWalletUserNotFound() throws Exception {
-        CreateWalletDTO createWalletDTO = new CreateWalletDTO();
-        createWalletDTO.setUserId(UUID.randomUUID()); // Non-existent user ID
-        createWalletDTO.setCurrency(TEST_CURRENCY);
+    @Nested
+    @DisplayName("API endpoint for transaction submission")
+    class TestTransactionSubmission {
+        public static final BigDecimal TEST_BALANCE = BigDecimal.valueOf(1000);
+        public static final BigDecimal TRANSACTION_AMOUNT = BigDecimal.valueOf(200);
 
-        mockMvc.perform(post("/api/wallets")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(createWalletDTO)))
-                .andExpect(status().isNotFound());
+        private WalletEntity testWallet;
 
-        assertThat(walletRepository.findAll()).isEmpty();
+        @BeforeEach
+        void setup() {
+            walletRepository.deleteAll();
+
+            testWallet = new WalletEntity();
+            testWallet.setUser(testUser);
+            testWallet.setCurrency(TEST_CURRENCY);
+            testWallet.setBalance(TEST_BALANCE);
+            testWallet = walletRepository.save(testWallet);
+        }
+
+        @Test
+        @DisplayName("Should save transaction in DB with all the fields mapped properly")
+        void testSubmitCreditTransaction() throws Exception {
+            SubmitTransactionDTO submitDTO = new SubmitTransactionDTO()
+                    .setAmount(TRANSACTION_AMOUNT)
+                    .setType(TransactionType.CREDIT);
+
+            TransactionDTO response = submitTransaction(submitDTO);
+
+            assertThat(response.getId()).isNotNull();
+            assertThat(response.getUserId()).isEqualByComparingTo(testUser.getId());
+            assertThat(response.getWalletId()).isEqualByComparingTo(testWallet.getId());
+            assertThat(response.getAmount()).isEqualByComparingTo(TRANSACTION_AMOUNT);
+            assertThat(response.getType()).isEqualTo(TransactionType.CREDIT);
+            assertThat(response.getBalanceBefore()).isEqualByComparingTo(TEST_BALANCE);
+            assertThat(response.getBalanceAfter()).isEqualByComparingTo(TEST_BALANCE.add(TRANSACTION_AMOUNT));
+            assertThat(response.getStatus()).isEqualTo(TransactionStatus.APPROVED);
+            assertThat(response.getCreatedAt()).isNotNull();
+
+            assertThat(transactionRepository.findAll()).hasSize(1);
+            TransactionEntity savedTransaction = transactionRepository.findAll().getFirst();
+            assertThat(savedTransaction.getId()).isNotNull();
+            assertThat(savedTransaction.getUser().getId()).isEqualByComparingTo(testUser.getId());
+            assertThat(savedTransaction.getAmount()).isEqualByComparingTo(TRANSACTION_AMOUNT);
+            assertThat(savedTransaction.getType()).isEqualTo(TransactionType.CREDIT);
+            assertThat(savedTransaction.getBalanceBefore()).isEqualByComparingTo(TEST_BALANCE);
+            assertThat(savedTransaction.getBalanceAfter()).isEqualByComparingTo(TEST_BALANCE.add(TRANSACTION_AMOUNT));
+            assertThat(savedTransaction.getStatus()).isEqualTo(TransactionStatus.APPROVED);
+            assertThat(savedTransaction.getCreatedAt()).isNotNull();
+        }
+
+        @Test
+        @DisplayName("Should add money to the user wallet for transactions under the threshold")
+        void testCreditTransaction() throws Exception {
+            SubmitTransactionDTO submitDTO = new SubmitTransactionDTO()
+                    .setAmount(TRANSACTION_AMOUNT)
+                    .setType(TransactionType.CREDIT);
+
+            BigDecimal expectedBalance = TEST_BALANCE.add(TRANSACTION_AMOUNT);
+
+            // Check if the response amount fields were returned with correct values
+            TransactionDTO response = submitTransaction(submitDTO);
+            assertThat(response.getBalanceBefore()).isEqualByComparingTo(TEST_BALANCE);
+            assertThat(response.getBalanceAfter()).isEqualByComparingTo(expectedBalance);
+
+            // Check if the transaction amounts were calculated properly
+            assertThat(transactionRepository.findAll()).hasSize(1);
+            TransactionEntity savedTransaction = transactionRepository.findAll().getFirst();
+            assertThat(savedTransaction.getBalanceBefore()).isEqualByComparingTo(TEST_BALANCE);
+            assertThat(savedTransaction.getBalanceAfter()).isEqualByComparingTo(expectedBalance);
+
+            // Check if the wallet balance has been updated
+            WalletEntity updatedWallet = walletRepository.findById(testWallet.getId()).orElseThrow();
+            assertThat(updatedWallet.getBalance()).isEqualByComparingTo(expectedBalance);
+        }
+
+        @Test
+        @DisplayName("Should deduct money from the user wallet for transactions under the threshold")
+        void testDebitTransaction() throws Exception {
+            SubmitTransactionDTO submitDTO = new SubmitTransactionDTO()
+                    .setAmount(TRANSACTION_AMOUNT)
+                    .setType(TransactionType.DEBIT);
+
+            BigDecimal expectedBalance = TEST_BALANCE.subtract(TRANSACTION_AMOUNT);
+
+            // Check if the response amount fields were returned with correct values
+            TransactionDTO response = submitTransaction(submitDTO);
+            assertThat(response.getBalanceBefore()).isEqualByComparingTo(TEST_BALANCE);
+            assertThat(response.getBalanceAfter()).isEqualByComparingTo(expectedBalance);
+
+            // Check if the transaction amounts were calculated properly
+            assertThat(transactionRepository.findAll()).hasSize(1);
+            TransactionEntity savedTransaction = transactionRepository.findAll().getFirst();
+            assertThat(savedTransaction.getBalanceBefore()).isEqualByComparingTo(TEST_BALANCE);
+            assertThat(savedTransaction.getBalanceAfter()).isEqualByComparingTo(expectedBalance);
+
+            // Check if the wallet balance has been updated
+            WalletEntity updatedWallet = walletRepository.findById(testWallet.getId()).orElseThrow();
+            assertThat(updatedWallet.getBalance()).isEqualByComparingTo(expectedBalance);
+        }
+
+        private TransactionDTO submitTransaction(SubmitTransactionDTO submitDTO) throws Exception {
+            String jsonResp = mockMvc.perform(post("/api/wallets/{walletId}/transactions", testWallet.getId())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(submitDTO)))
+                    .andExpect(status().isAccepted())
+                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                    .andReturn().getResponse().getContentAsString();
+
+            return objectMapper.readValue(jsonResp, TransactionDTO.class);
+        }
     }
 
-    @Test
-    @DisplayName("Should not create a wallet if it already exists for a given userId and currency combination")
-    void testCreateWalletWalletAlreadyExists() throws Exception {
-        WalletEntity existingWallet = new WalletEntity();
-        existingWallet.setUser(testUser);
-        existingWallet.setCurrency(TEST_CURRENCY);
-        existingWallet.setBalance(BigDecimal.valueOf(10000L));
-        walletRepository.save(existingWallet);
-
-        CreateWalletDTO createWalletDTO = new CreateWalletDTO();
-        createWalletDTO.setUserId(testUser.getId());
-        createWalletDTO.setCurrency(TEST_CURRENCY);
-
-        mockMvc.perform(post("/api/wallets")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(createWalletDTO)))
-                .andExpect(status().isConflict());
-
-    }
-
-    @Test
-    @DisplayName("Should not create wallet when request validation fails")
-    void testCreateWalletValidation() throws Exception {
-        CreateWalletDTO createWalletDTO = new CreateWalletDTO();
-
-        // currency is blank
-        createWalletDTO.setUserId(testUser.getId());
-        createWalletDTO.setCurrency("");
-        mockMvc.perform(post("/api/wallets")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(createWalletDTO)))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.validationErrors", hasSize(1)))
-                .andExpect(jsonPath("$.validationErrors[0].field").value("currency"))
-                .andExpect(jsonPath("$.validationErrors[0].message").value("must not be blank"))
-                .andExpect(jsonPath("$.validationErrors[0].rejectedValue").value(""));
-
-        // Null userId
-        createWalletDTO.setCurrency("USD");
-        createWalletDTO.setUserId(null);
-        mockMvc.perform(post("/api/wallets")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(createWalletDTO)))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.validationErrors", hasSize(1)))
-                .andExpect(jsonPath("$.validationErrors[0].field").value("userId"))
-                .andExpect(jsonPath("$.validationErrors[0].message").value("must not be null"))
-                .andExpect(jsonPath("$.validationErrors[0].rejectedValue").isEmpty());
-
-        assertThat(walletRepository.findAll()).isEmpty();
-    }
 
 }
