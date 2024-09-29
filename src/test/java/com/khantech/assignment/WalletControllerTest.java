@@ -1,6 +1,7 @@
 package com.khantech.assignment;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.khantech.assignment.config.AppProperties;
 import com.khantech.assignment.dto.CreateWalletDTO;
 import com.khantech.assignment.dto.SubmitTransactionDTO;
 import com.khantech.assignment.dto.TransactionDTO;
@@ -17,9 +18,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.Answers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -29,6 +32,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -54,6 +58,9 @@ class WalletControllerTest {
 
     @Autowired
     private TransactionRepository transactionRepository;
+
+    @MockBean(answer = Answers.RETURNS_DEEP_STUBS)
+    private AppProperties appProperties;
 
     private UserEntity testUser;
 
@@ -173,8 +180,10 @@ class WalletControllerTest {
     @Nested
     @DisplayName("API endpoint for transaction submission")
     class TestTransactionSubmission {
-        public static final BigDecimal TEST_BALANCE = BigDecimal.valueOf(1000);
-        public static final BigDecimal TRANSACTION_AMOUNT = BigDecimal.valueOf(200);
+        public static final BigDecimal TEST_BALANCE = BigDecimal.valueOf(100_000);
+        public static final BigDecimal THRESHOLD = BigDecimal.valueOf(5000);
+        public static final BigDecimal AMOUNT_WITHIN_THRESHOLD = BigDecimal.valueOf(200);
+        public static final BigDecimal AMOUNT_ABOVE_THRESHOLD = THRESHOLD.add(BigDecimal.ONE);
 
         private WalletEntity testWallet;
 
@@ -187,13 +196,15 @@ class WalletControllerTest {
             testWallet.setCurrency(TEST_CURRENCY);
             testWallet.setBalance(TEST_BALANCE);
             testWallet = walletRepository.save(testWallet);
+
+            when(appProperties.getWallet().getTransaction().getThreshold()).thenReturn(THRESHOLD);
         }
 
         @Test
-        @DisplayName("Should save transaction in DB with all the fields mapped properly")
+        @DisplayName("Should save transaction in DB with all the fields mapped properly without null values")
         void testSubmitCreditTransaction() throws Exception {
             SubmitTransactionDTO submitDTO = new SubmitTransactionDTO()
-                    .setAmount(TRANSACTION_AMOUNT)
+                    .setAmount(AMOUNT_WITHIN_THRESHOLD)
                     .setType(TransactionType.CREDIT);
 
             TransactionDTO response = submitTransaction(submitDTO);
@@ -201,73 +212,125 @@ class WalletControllerTest {
             assertThat(response.getId()).isNotNull();
             assertThat(response.getUserId()).isEqualByComparingTo(testUser.getId());
             assertThat(response.getWalletId()).isEqualByComparingTo(testWallet.getId());
-            assertThat(response.getAmount()).isEqualByComparingTo(TRANSACTION_AMOUNT);
+            assertThat(response.getAmount()).isEqualByComparingTo(AMOUNT_WITHIN_THRESHOLD);
             assertThat(response.getType()).isEqualTo(TransactionType.CREDIT);
             assertThat(response.getBalanceBefore()).isEqualByComparingTo(TEST_BALANCE);
-            assertThat(response.getBalanceAfter()).isEqualByComparingTo(TEST_BALANCE.add(TRANSACTION_AMOUNT));
+            assertThat(response.getBalanceAfter()).isEqualByComparingTo(TEST_BALANCE.add(AMOUNT_WITHIN_THRESHOLD));
             assertThat(response.getStatus()).isEqualTo(TransactionStatus.APPROVED);
             assertThat(response.getCreatedAt()).isNotNull();
+
+            assertThat(response).hasNoNullFieldsOrProperties();
 
             assertThat(transactionRepository.findAll()).hasSize(1);
             TransactionEntity savedTransaction = transactionRepository.findAll().getFirst();
             assertThat(savedTransaction.getId()).isNotNull();
             assertThat(savedTransaction.getUser().getId()).isEqualByComparingTo(testUser.getId());
-            assertThat(savedTransaction.getAmount()).isEqualByComparingTo(TRANSACTION_AMOUNT);
+            assertThat(savedTransaction.getAmount()).isEqualByComparingTo(AMOUNT_WITHIN_THRESHOLD);
             assertThat(savedTransaction.getType()).isEqualTo(TransactionType.CREDIT);
             assertThat(savedTransaction.getBalanceBefore()).isEqualByComparingTo(TEST_BALANCE);
-            assertThat(savedTransaction.getBalanceAfter()).isEqualByComparingTo(TEST_BALANCE.add(TRANSACTION_AMOUNT));
+            assertThat(savedTransaction.getBalanceAfter()).isEqualByComparingTo(TEST_BALANCE.add(AMOUNT_WITHIN_THRESHOLD));
             assertThat(savedTransaction.getStatus()).isEqualTo(TransactionStatus.APPROVED);
             assertThat(savedTransaction.getCreatedAt()).isNotNull();
+
+            assertThat(savedTransaction).hasNoNullFieldsOrProperties();
         }
 
         @Test
-        @DisplayName("Should add money to the user wallet for transactions under the threshold")
+        @DisplayName("Should automatically add money to the user wallet for transactions under the threshold")
         void testCreditTransaction() throws Exception {
             SubmitTransactionDTO submitDTO = new SubmitTransactionDTO()
-                    .setAmount(TRANSACTION_AMOUNT)
+                    .setAmount(AMOUNT_WITHIN_THRESHOLD)
                     .setType(TransactionType.CREDIT);
 
-            BigDecimal expectedBalance = TEST_BALANCE.add(TRANSACTION_AMOUNT);
+            BigDecimal expectedBalance = TEST_BALANCE.add(AMOUNT_WITHIN_THRESHOLD);
 
-            // Check if the response amount fields were returned with correct values
             TransactionDTO response = submitTransaction(submitDTO);
-            assertThat(response.getBalanceBefore()).isEqualByComparingTo(TEST_BALANCE);
-            assertThat(response.getBalanceAfter()).isEqualByComparingTo(expectedBalance);
+            verifyBalanceChange(response, expectedBalance);
 
-            // Check if the transaction amounts were calculated properly
-            assertThat(transactionRepository.findAll()).hasSize(1);
-            TransactionEntity savedTransaction = transactionRepository.findAll().getFirst();
-            assertThat(savedTransaction.getBalanceBefore()).isEqualByComparingTo(TEST_BALANCE);
-            assertThat(savedTransaction.getBalanceAfter()).isEqualByComparingTo(expectedBalance);
-
-            // Check if the wallet balance has been updated
-            WalletEntity updatedWallet = walletRepository.findById(testWallet.getId()).orElseThrow();
-            assertThat(updatedWallet.getBalance()).isEqualByComparingTo(expectedBalance);
+            TransactionEntity transaction = transactionRepository.findById(response.getId()).orElseThrow();
+            assertThat(transaction.getStatus()).isEqualTo(TransactionStatus.APPROVED);
         }
 
         @Test
-        @DisplayName("Should deduct money from the user wallet for transactions under the threshold")
+        @DisplayName("Should automatically deduct money from the user wallet for transactions under the threshold")
         void testDebitTransaction() throws Exception {
             SubmitTransactionDTO submitDTO = new SubmitTransactionDTO()
-                    .setAmount(TRANSACTION_AMOUNT)
+                    .setAmount(AMOUNT_WITHIN_THRESHOLD)
                     .setType(TransactionType.DEBIT);
 
-            BigDecimal expectedBalance = TEST_BALANCE.subtract(TRANSACTION_AMOUNT);
+            BigDecimal expectedBalance = TEST_BALANCE.subtract(AMOUNT_WITHIN_THRESHOLD);
 
-            // Check if the response amount fields were returned with correct values
             TransactionDTO response = submitTransaction(submitDTO);
-            assertThat(response.getBalanceBefore()).isEqualByComparingTo(TEST_BALANCE);
-            assertThat(response.getBalanceAfter()).isEqualByComparingTo(expectedBalance);
+            verifyBalanceChange(response, expectedBalance);
 
-            // Check if the transaction amounts were calculated properly
-            assertThat(transactionRepository.findAll()).hasSize(1);
-            TransactionEntity savedTransaction = transactionRepository.findAll().getFirst();
-            assertThat(savedTransaction.getBalanceBefore()).isEqualByComparingTo(TEST_BALANCE);
-            assertThat(savedTransaction.getBalanceAfter()).isEqualByComparingTo(expectedBalance);
+            TransactionEntity transaction = transactionRepository.findById(response.getId()).orElseThrow();
+            assertThat(transaction.getStatus()).isEqualTo(TransactionStatus.APPROVED);
+        }
 
-            // Check if the wallet balance has been updated
-            WalletEntity updatedWallet = walletRepository.findById(testWallet.getId()).orElseThrow();
-            assertThat(updatedWallet.getBalance()).isEqualByComparingTo(expectedBalance);
+        @Test
+        @DisplayName("Should return error when wallet does not exist")
+        void testSubmitTransactionWalletNotFound() throws Exception {
+            SubmitTransactionDTO submitDTO = new SubmitTransactionDTO()
+                    .setAmount(AMOUNT_WITHIN_THRESHOLD)
+                    .setType(TransactionType.DEBIT);
+
+            mockMvc.perform(post("/api/wallets/{walletId}/transactions", UUID.randomUUID())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(submitDTO)))
+                    .andExpect(status().isNotFound());
+
+            assertThat(transactionRepository.findAll()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Should return error when debiting user wallet with insufficient funds for transactions under the threshold")
+        void testSubmitDebitTransactionWhenInsufficientFunds() throws Exception {
+            testWallet.setBalance(BigDecimal.ZERO);
+            walletRepository.save(testWallet);
+
+            SubmitTransactionDTO submitDTO = new SubmitTransactionDTO()
+                    .setAmount(AMOUNT_WITHIN_THRESHOLD)
+                    .setType(TransactionType.DEBIT);
+
+            mockMvc.perform(post("/api/wallets/{walletId}/transactions", testWallet.getId())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(submitDTO)))
+                    .andExpect(status().isBadRequest());
+
+            assertThat(transactionRepository.findAll()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Should return error when debiting user wallet with insufficient funds for transactions above the threshold")
+        void testSubmitDebitTransactionWhenInsufficientFundsAboveThreshold() throws Exception {
+            testWallet.setBalance(BigDecimal.ZERO);
+            walletRepository.save(testWallet);
+
+            SubmitTransactionDTO submitDTO = new SubmitTransactionDTO()
+                    .setAmount(AMOUNT_ABOVE_THRESHOLD)
+                    .setType(TransactionType.DEBIT);
+
+            mockMvc.perform(post("/api/wallets/{walletId}/transactions", testWallet.getId())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(submitDTO)))
+                    .andExpect(status().isBadRequest());
+
+            assertThat(transactionRepository.findAll()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Should save transaction above threshold in AWAITING_APPROVAL status without changing wallet balance")
+        void testSubmitTransactionWithoutBalanceChangeAboveTheThreshold() throws Exception {
+            SubmitTransactionDTO submitDTO = new SubmitTransactionDTO()
+                    .setAmount(AMOUNT_ABOVE_THRESHOLD)
+                    .setType(TransactionType.DEBIT);
+
+            TransactionDTO response = submitTransaction(submitDTO);
+
+            verifyBalanceChange(response, TEST_BALANCE);
+
+            TransactionEntity transaction = transactionRepository.findById(response.getId()).orElseThrow();
+            assertThat(transaction.getStatus()).isEqualTo(TransactionStatus.AWAITING_APPROVAL);
         }
 
         private TransactionDTO submitTransaction(SubmitTransactionDTO submitDTO) throws Exception {
@@ -280,7 +343,22 @@ class WalletControllerTest {
 
             return objectMapper.readValue(jsonResp, TransactionDTO.class);
         }
-    }
 
+        private void verifyBalanceChange(TransactionDTO response, BigDecimal expectedBalance) {
+            // CHeck if the response contains properly calculated fields
+            assertThat(response.getBalanceBefore()).isEqualByComparingTo(TEST_BALANCE);
+            assertThat(response.getBalanceAfter()).isEqualByComparingTo(expectedBalance);
+
+            // Check if the transaction amounts were calculated properly
+            assertThat(transactionRepository.findAll()).hasSize(1);
+            TransactionEntity savedTransaction = transactionRepository.findAll().getFirst();
+            assertThat(savedTransaction.getBalanceBefore()).isEqualByComparingTo(TEST_BALANCE);
+            assertThat(savedTransaction.getBalanceAfter()).isEqualByComparingTo(expectedBalance);
+
+            // Check if the wallet balance has been updated
+            WalletEntity updatedWallet = walletRepository.findById(testWallet.getId()).orElseThrow();
+            assertThat(updatedWallet.getBalance()).isEqualByComparingTo(expectedBalance);
+        }
+    }
 
 }

@@ -10,3 +10,8 @@ spring:
     url: "jdbc:postgresql://localhost:5432/khantech-assignment"
     username: khantech
     password: khantech
+
+app:
+  wallet:
+    transaction:
+      threshold: 5000

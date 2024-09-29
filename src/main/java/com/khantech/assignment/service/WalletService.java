@@ -1,5 +1,6 @@
 package com.khantech.assignment.service;
 
+import com.khantech.assignment.config.AppProperties;
 import com.khantech.assignment.dto.CreateWalletDTO;
 import com.khantech.assignment.dto.SubmitTransactionDTO;
 import com.khantech.assignment.dto.TransactionDTO;
@@ -9,6 +10,7 @@ import com.khantech.assignment.entity.UserEntity;
 import com.khantech.assignment.entity.WalletEntity;
 import com.khantech.assignment.enums.TransactionStatus;
 import com.khantech.assignment.enums.TransactionType;
+import com.khantech.assignment.error.InsufficientFundsException;
 import com.khantech.assignment.error.UserNotFoundException;
 import com.khantech.assignment.error.WalletAlreadyExistsException;
 import com.khantech.assignment.error.WalletNotFoundException;
@@ -30,6 +32,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class WalletService {
 
+    private final AppProperties appProperties;
     private final UserRepository userRepository;
     private final WalletRepository walletRepository;
     private final TransactionRepository transactionRepository;
@@ -46,27 +49,30 @@ public class WalletService {
                     throw new WalletAlreadyExistsException(dto.getUserId(), dto.getCurrency());
                 });
 
-        WalletEntity wallet = new WalletEntity();
-        wallet.setUser(user);
-        wallet.setCurrency(dto.getCurrency());
-        wallet.setBalance(BigDecimal.ZERO);
+        WalletEntity wallet = new WalletEntity()
+                .setUser(user)
+                .setCurrency(dto.getCurrency())
+                .setBalance(BigDecimal.ZERO);
 
         this.walletRepository.save(wallet);
 
-        WalletDTO walletDTO = new WalletDTO();
-        walletDTO.setId(wallet.getId());
-        walletDTO.setUserId(user.getId());
-        walletDTO.setCurrency(wallet.getCurrency());
-        walletDTO.setBalance(wallet.getBalance());
-
-        return walletDTO;
+        return new WalletDTO()
+                .setId(wallet.getId())
+                .setUserId(user.getId())
+                .setCurrency(wallet.getCurrency())
+                .setBalance(wallet.getBalance());
     }
 
     public TransactionDTO submitTransaction(UUID walletId, SubmitTransactionDTO submitDTO) {
-
         WalletEntity wallet = this.walletRepository
                 .findById(walletId)
                 .orElseThrow(() -> new WalletNotFoundException(walletId));
+
+        if (submitDTO.getType() == TransactionType.DEBIT) {
+            if (wallet.getBalance().compareTo(submitDTO.getAmount()) < 0) {
+                throw new InsufficientFundsException(walletId, wallet.getBalance(), submitDTO.getAmount());
+            }
+        }
 
         UserEntity user = wallet.getUser();
 
@@ -75,12 +81,18 @@ public class WalletService {
                 .setWallet(wallet)
                 .setAmount(submitDTO.getAmount())
                 .setBalanceBefore(wallet.getBalance())
-                .setBalanceAfter(wallet.getBalance().add(getTransactionAmount(submitDTO)))
                 .setType(submitDTO.getType())
-                .setStatus(TransactionStatus.APPROVED)
                 .setCreatedAt(Instant.now());
 
-        wallet.setBalance(wallet.getBalance().add(getTransactionAmount(submitDTO)));
+        if (isWithinThreshold(submitDTO.getAmount())) {
+            transaction.setStatus(TransactionStatus.APPROVED);
+            transaction.setBalanceAfter(wallet.getBalance().add(getTransactionAmount(submitDTO)));
+            wallet.setBalance(wallet.getBalance().add(getTransactionAmount(submitDTO)));
+        } else {
+            transaction.setStatus(TransactionStatus.AWAITING_APPROVAL);
+            transaction.setBalanceAfter(wallet.getBalance());
+        }
+
         walletRepository.save(wallet);
         transactionRepository.save(transaction);
 
@@ -94,6 +106,11 @@ public class WalletService {
                 .setBalanceAfter(transaction.getBalanceAfter())
                 .setStatus(transaction.getStatus())
                 .setCreatedAt(transaction.getCreatedAt());
+    }
+
+    private boolean isWithinThreshold(BigDecimal amount) {
+        BigDecimal threshold = appProperties.getWallet().getTransaction().getThreshold();
+        return threshold.compareTo(amount) > 0;
     }
 
     private static BigDecimal getTransactionAmount(SubmitTransactionDTO submitDTO) {
