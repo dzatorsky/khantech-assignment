@@ -17,10 +17,14 @@ import com.khantech.assignment.repository.WalletRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -125,6 +129,27 @@ public class WalletService {
         } else {
             throw new InvalidTransactionStateException(transactionId, transaction.getStatus(), TransactionStatus.AWAITING_APPROVAL);
         }
+    }
+
+    public void rejectExpiredTransactions(Integer batchSize) {
+        Instant expirationDate = Instant.now().minus(appProperties.getWallet().getTransaction().getApprovalTimeout());
+
+        Pageable pageable = PageRequest.of(0, batchSize, Sort.by(Sort.Direction.ASC, TransactionEntity.Fields.createdAt));
+
+        List<TransactionEntity> rejectedTransactions = this.transactionRepository
+                .findAllByStatusAndCreatedAtBefore(TransactionStatus.AWAITING_APPROVAL, expirationDate, pageable)
+                .stream()
+                .map(transaction -> {
+                    if (transaction.getStatus() == TransactionStatus.AWAITING_APPROVAL) {
+                        transaction.setStatus(TransactionStatus.REJECTED);
+                        return transaction;
+                    } else {
+                        throw new InvalidTransactionStateException(transaction.getId(), transaction.getStatus(), TransactionStatus.AWAITING_APPROVAL);
+                    }
+                })
+                .toList();
+
+        transactionRepository.saveAll(rejectedTransactions);
     }
 
     private boolean isWithinThreshold(BigDecimal amount) {

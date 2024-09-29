@@ -1,4 +1,4 @@
-package com.khantech.assignment;
+package com.khantech.assignment.api;
 
 import com.khantech.assignment.entity.TransactionEntity;
 import com.khantech.assignment.entity.UserEntity;
@@ -8,7 +8,6 @@ import com.khantech.assignment.enums.TransactionType;
 import com.khantech.assignment.repository.TransactionRepository;
 import com.khantech.assignment.repository.UserRepository;
 import com.khantech.assignment.repository.WalletRepository;
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

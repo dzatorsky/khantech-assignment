@@ -1,4 +1,4 @@
-package com.khantech.assignment;
+package com.khantech.assignment.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.khantech.assignment.config.AppProperties;

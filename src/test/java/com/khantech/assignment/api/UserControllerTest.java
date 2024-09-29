@@ -1,10 +1,12 @@
-package com.khantech.assignment;
+package com.khantech.assignment.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.khantech.assignment.dto.CreateUserDTO;
 import com.khantech.assignment.dto.UserDTO;
 import com.khantech.assignment.entity.UserEntity;
+import com.khantech.assignment.repository.TransactionRepository;
 import com.khantech.assignment.repository.UserRepository;
+import com.khantech.assignment.repository.WalletRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,6 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class UserControllerTest {
 
     public static final String TEST_USER_NAME = "John Doe";
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -35,8 +38,16 @@ class UserControllerTest {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private WalletRepository walletRepository;
+
+    @Autowired
+    private TransactionRepository transactionRepository;
+
     @BeforeEach
     void setup() {
+        transactionRepository.deleteAll();
+        walletRepository.deleteAll();
         userRepository.deleteAll();
     }
 

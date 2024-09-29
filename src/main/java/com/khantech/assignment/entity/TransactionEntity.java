@@ -6,6 +6,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
+import lombok.experimental.FieldNameConstants;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -14,6 +15,7 @@ import java.util.UUID;
 @Getter
 @Setter
 @Entity
+@FieldNameConstants
 @Accessors(chain = true)
 @Table(name = "transaction")
 public class TransactionEntity {

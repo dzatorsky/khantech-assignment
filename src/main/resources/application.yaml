@@ -15,3 +15,10 @@ app:
   wallet:
     transaction:
       threshold: 5000
+      approval-timeout: 1d
+  scheduler:
+    enabled: true
+    approval-timeout-job:
+      # Runs at midnight every day. Use "*/5 * * * * *" for test
+      cron: "0 0 0 * * *"
+      batch-size: 1000

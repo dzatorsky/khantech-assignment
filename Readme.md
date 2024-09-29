@@ -76,3 +76,6 @@ The challenge lies in processing the transactions according to specific business
 Prerequisites to run the solution:
    1. Java 23
    2. Docker (for integration tests using test containers)
+
+Processing transaction synchronously is more reliable way of workiing with transactions, therefore state PENDING has been removed. 
+So transactions go through the validation steps and transit into either APPROVED or WAITING_APPROVAL states immediately on submission.

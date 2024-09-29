@@ -1,5 +1,5 @@
 package com.khantech.assignment.enums;
 
 public enum TransactionStatus {
-    PENDING, APPROVED, REJECTED, AWAITING_APPROVAL
+    APPROVED, REJECTED, AWAITING_APPROVAL
 }
