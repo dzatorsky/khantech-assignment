@@ -1,5 +1,6 @@
 package com.khantech.assignment.scheduler;
 
+import com.khantech.assignment.TestContainerConfiguration;
 import com.khantech.assignment.config.AppProperties;
 import com.khantech.assignment.entity.TransactionEntity;
 import com.khantech.assignment.entity.UserEntity;
@@ -17,7 +18,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.test.context.ActiveProfiles;
+import org.springframework.context.annotation.Import;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -27,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 @SpringBootTest
-@ActiveProfiles("test")
+@Import(TestContainerConfiguration.class)
 class ApprovalTimeoutScheduledJobTest {
 
     public static final String TEST_CURRENCY = "USD";

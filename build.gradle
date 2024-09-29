@@ -64,3 +64,19 @@ tasks.named('asciidoctor') {
     inputs.dir snippetsDir
     dependsOn test
 }
+
+test {
+    useJUnitPlatform()
+    systemProperty 'spring.profiles.active', 'test,test-inmemory'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+}
+
+tasks.register('integrationTest', Test) {
+    useJUnitPlatform()
+    systemProperty 'spring.profiles.active', 'test,test-integration'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+}
+
+check.dependsOn test, integrationTest
