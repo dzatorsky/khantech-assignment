@@ -73,9 +73,13 @@ The challenge lies in processing the transactions according to specific business
    ```
 
 # Comments from Danylo
-Prerequisites to run the solution:
+- Prerequisites to run the solution:
    1. Java 23
    2. Docker (for integration tests using test containers)
 
-Processing transaction synchronously is more reliable way of workiing with transactions, therefore state PENDING has been removed. 
+- Processing transaction synchronously is more reliable way of workiing with transactions, therefore state PENDING has been removed. 
 So transactions go through the validation steps and transit into either APPROVED or WAITING_APPROVAL states immediately on submission.
+- Chain of responsibility used for transaction approval and submission with idea that there might be much more business rules to be added in the future
+- All of the tests use DB under the hood instead of mockito mocks. The database implementation chosen based on profile, therefore in order to run all the tests you need to do:
+    - `./gradlew test` #This will run all tests with H2
+    - `./gradlew integrationTest` #This will run all tests with Postgres DB running as docker test container. This will spawn docker container automatically.

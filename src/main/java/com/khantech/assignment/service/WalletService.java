@@ -9,11 +9,14 @@ import com.khantech.assignment.entity.TransactionEntity;
 import com.khantech.assignment.entity.UserEntity;
 import com.khantech.assignment.entity.WalletEntity;
 import com.khantech.assignment.enums.TransactionStatus;
-import com.khantech.assignment.enums.TransactionType;
 import com.khantech.assignment.error.*;
 import com.khantech.assignment.repository.TransactionRepository;
 import com.khantech.assignment.repository.UserRepository;
 import com.khantech.assignment.repository.WalletRepository;
+import com.khantech.assignment.service.handler.approval.ApproveTransactionContext;
+import com.khantech.assignment.service.handler.approval.ApproveTransactionHandler;
+import com.khantech.assignment.service.handler.submission.SubmitTransactionContext;
+import com.khantech.assignment.service.handler.submission.SubmitTransactionHandler;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +40,8 @@ public class WalletService {
     private final UserRepository userRepository;
     private final WalletRepository walletRepository;
     private final TransactionRepository transactionRepository;
+    private final List<SubmitTransactionHandler> submitTransactionHandlers;
+    private final List<ApproveTransactionHandler> approveTransactionHandlers;
 
     public Wallet createWallet(CreateWalletRequest request) {
 
@@ -69,33 +74,16 @@ public class WalletService {
                 .findById(walletId)
                 .orElseThrow(() -> new WalletNotFoundException(walletId));
 
-        transactionRepository
-                .findByRequestId(request.getRequestId())
-                .ifPresent(transaction -> {
-                    throw new DuplicatedTransactionException(transaction.getRequestId());
-                });
-
-        UserEntity user = wallet.getUser();
-
         TransactionEntity transaction = new TransactionEntity()
                 .setRequestId(request.getRequestId())
-                .setUser(user)
+                .setUser(wallet.getUser())
                 .setWallet(wallet)
                 .setAmount(request.getAmount())
                 .setBalanceBefore(wallet.getBalance())
                 .setType(request.getType())
                 .setCreatedAt(Instant.now());
 
-        if (isWithinThreshold(request.getAmount())) {
-            transaction.setStatus(TransactionStatus.APPROVED);
-            transaction.setBalanceAfter(wallet.getBalance().add(getTransactionAmount(request.getType(), request.getAmount())));
-            wallet.setBalance(wallet.getBalance().add(getTransactionAmount(request.getType(), request.getAmount())));
-        } else {
-            transaction.setStatus(TransactionStatus.AWAITING_APPROVAL);
-            transaction.setBalanceAfter(wallet.getBalance());
-        }
-
-        verifyEnoughBalance(wallet);
+        submitTransactionHandlers.forEach(step -> step.handle(new SubmitTransactionContext(transaction), request));
 
         walletRepository.save(wallet);
         transactionRepository.save(transaction);
@@ -103,7 +91,7 @@ public class WalletService {
         return new Transaction()
                 .setId(transaction.getId())
                 .setRequestId(transaction.getRequestId())
-                .setUserId(user.getId())
+                .setUserId(wallet.getUser().getId())
                 .setWalletId(wallet.getId())
                 .setAmount(transaction.getAmount())
                 .setType(transaction.getType())
@@ -118,25 +106,10 @@ public class WalletService {
                 .findById(transactionId)
                 .orElseThrow(() -> new TransactionNotFoundException(transactionId));
 
-        if (transaction.getStatus() == TransactionStatus.AWAITING_APPROVAL) {
-            WalletEntity wallet = transaction.getWallet();
+        approveTransactionHandlers.forEach(step -> step.handle(new ApproveTransactionContext(transaction)));
 
-            transaction.setStatus(TransactionStatus.APPROVED);
-            transaction.setBalanceBefore(wallet.getBalance());
-
-            BigDecimal transactionAmount = getTransactionAmount(transaction.getType(), transaction.getAmount());
-            BigDecimal newBalance = wallet.getBalance().add(transactionAmount);
-
-            wallet.setBalance(newBalance);
-            transaction.setBalanceAfter(newBalance);
-
-            verifyEnoughBalance(wallet);
-
-            walletRepository.save(wallet);
-            transactionRepository.save(transaction);
-        } else {
-            throw new InvalidTransactionStateException(transactionId, transaction.getStatus(), TransactionStatus.AWAITING_APPROVAL);
-        }
+        walletRepository.save(transaction.getWallet());
+        transactionRepository.save(transaction);
     }
 
     public void rejectExpiredTransactions(Integer batchSize) {
@@ -160,22 +133,4 @@ public class WalletService {
         transactionRepository.saveAll(rejectedTransactions);
     }
 
-    private boolean isWithinThreshold(BigDecimal amount) {
-        BigDecimal threshold = appProperties.getWallet().getTransaction().getThreshold();
-        return threshold.compareTo(amount) > 0;
-    }
-
-    private BigDecimal getTransactionAmount(TransactionType transactionType, BigDecimal transactionAmount) {
-        BigDecimal amount = transactionAmount;
-        if (transactionType == TransactionType.DEBIT) {
-            amount = transactionAmount.negate();
-        }
-        return amount;
-    }
-
-    private void verifyEnoughBalance(WalletEntity wallet) {
-        if (wallet.getBalance().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new InsufficientFundsException(wallet.getId(), wallet.getBalance());
-        }
-    }
 }
