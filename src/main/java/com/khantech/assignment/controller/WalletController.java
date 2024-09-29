@@ -1,9 +1,9 @@
 package com.khantech.assignment.controller;
 
-import com.khantech.assignment.dto.CreateWalletDTO;
-import com.khantech.assignment.dto.SubmitTransactionDTO;
-import com.khantech.assignment.dto.TransactionDTO;
-import com.khantech.assignment.dto.WalletDTO;
+import com.khantech.assignment.dto.CreateWalletRequest;
+import com.khantech.assignment.dto.SubmitTransactionRequest;
+import com.khantech.assignment.dto.Transaction;
+import com.khantech.assignment.dto.Wallet;
 import com.khantech.assignment.service.WalletService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,18 +23,18 @@ public class WalletController {
     private final WalletService walletService;
 
     @PostMapping
-    public ResponseEntity<WalletDTO> createWallet(@Valid @RequestBody CreateWalletDTO dto) {
-        WalletDTO walletDTO = walletService.createWallet(dto);
-        return new ResponseEntity<>(walletDTO, HttpStatus.CREATED);
+    public ResponseEntity<Wallet> createWallet(@Valid @RequestBody CreateWalletRequest request) {
+        Wallet wallet = walletService.createWallet(request);
+        return new ResponseEntity<>(wallet, HttpStatus.CREATED);
     }
 
     @PostMapping("/{walletId}/transactions")
-    public ResponseEntity<TransactionDTO> submitTransaction(@PathVariable UUID walletId,
-                                                            @Valid @RequestBody SubmitTransactionDTO dto) {
+    public ResponseEntity<Transaction> submitTransaction(@PathVariable UUID walletId,
+                                                         @Valid @RequestBody SubmitTransactionRequest request) {
 
-        TransactionDTO transactionDTO = walletService.submitTransaction(walletId, dto);
+        Transaction transaction = walletService.submitTransaction(walletId, request);
 
-        return new ResponseEntity<>(transactionDTO, HttpStatus.ACCEPTED);
+        return new ResponseEntity<>(transaction, HttpStatus.ACCEPTED);
     }
 
 }

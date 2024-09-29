@@ -1,7 +1,7 @@
 package com.khantech.assignment.service;
 
-import com.khantech.assignment.dto.CreateUserDTO;
-import com.khantech.assignment.dto.UserDTO;
+import com.khantech.assignment.dto.CreateUserRequest;
+import com.khantech.assignment.dto.User;
 import com.khantech.assignment.entity.UserEntity;
 import com.khantech.assignment.repository.UserRepository;
 import jakarta.transaction.Transactional;
@@ -17,16 +17,16 @@ public class UserService {
 
     private final UserRepository userRepository;
 
-    public UserDTO createUser(CreateUserDTO dto) {
+    public User createUser(CreateUserRequest request) {
         UserEntity entity = new UserEntity();
-        entity.setName(dto.getName());
+        entity.setName(request.getName());
 
         userRepository.save(entity);
 
-        UserDTO userDTO = new UserDTO();
-        userDTO.setId(entity.getId());
-        userDTO.setName(entity.getName());
+        User user = new User();
+        user.setId(entity.getId());
+        user.setName(entity.getName());
 
-        return userDTO;
+        return user;
     }
 }

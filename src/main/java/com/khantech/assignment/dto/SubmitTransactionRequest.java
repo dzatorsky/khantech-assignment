@@ -10,7 +10,7 @@ import java.math.BigDecimal;
 
 @Data
 @Accessors(chain = true)
-public class SubmitTransactionDTO {
+public class SubmitTransactionRequest {
 
     @NotNull
     @Positive

@@ -9,7 +9,7 @@ import java.util.UUID;
 
 @Data
 @Accessors(chain = true)
-public class CreateWalletDTO {
+public class CreateWalletRequest {
 
     @NotNull
     private UUID userId;

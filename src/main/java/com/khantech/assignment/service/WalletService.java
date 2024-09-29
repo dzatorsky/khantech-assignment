@@ -1,10 +1,10 @@
 package com.khantech.assignment.service;
 
 import com.khantech.assignment.config.AppProperties;
-import com.khantech.assignment.dto.CreateWalletDTO;
-import com.khantech.assignment.dto.SubmitTransactionDTO;
-import com.khantech.assignment.dto.TransactionDTO;
-import com.khantech.assignment.dto.WalletDTO;
+import com.khantech.assignment.dto.CreateWalletRequest;
+import com.khantech.assignment.dto.SubmitTransactionRequest;
+import com.khantech.assignment.dto.Transaction;
+import com.khantech.assignment.dto.Wallet;
 import com.khantech.assignment.entity.TransactionEntity;
 import com.khantech.assignment.entity.UserEntity;
 import com.khantech.assignment.entity.WalletEntity;
@@ -38,33 +38,33 @@ public class WalletService {
     private final WalletRepository walletRepository;
     private final TransactionRepository transactionRepository;
 
-    public WalletDTO createWallet(CreateWalletDTO dto) {
+    public Wallet createWallet(CreateWalletRequest request) {
 
         UserEntity user = this.userRepository
-                .findById(dto.getUserId())
-                .orElseThrow(() -> new UserNotFoundException(dto.getUserId()));
+                .findById(request.getUserId())
+                .orElseThrow(() -> new UserNotFoundException(request.getUserId()));
 
         this.walletRepository
-                .findByUserIdAndCurrency(dto.getUserId(), dto.getCurrency())
+                .findByUserIdAndCurrency(request.getUserId(), request.getCurrency())
                 .ifPresent(_ -> {
-                    throw new WalletAlreadyExistsException(dto.getUserId(), dto.getCurrency());
+                    throw new WalletAlreadyExistsException(request.getUserId(), request.getCurrency());
                 });
 
         WalletEntity wallet = new WalletEntity()
                 .setUser(user)
-                .setCurrency(dto.getCurrency())
+                .setCurrency(request.getCurrency())
                 .setBalance(BigDecimal.ZERO);
 
         this.walletRepository.save(wallet);
 
-        return new WalletDTO()
+        return new Wallet()
                 .setId(wallet.getId())
                 .setUserId(user.getId())
                 .setCurrency(wallet.getCurrency())
                 .setBalance(wallet.getBalance());
     }
 
-    public TransactionDTO submitTransaction(UUID walletId, SubmitTransactionDTO submitDTO) {
+    public Transaction submitTransaction(UUID walletId, SubmitTransactionRequest request) {
         WalletEntity wallet = this.walletRepository
                 .findById(walletId)
                 .orElseThrow(() -> new WalletNotFoundException(walletId));
@@ -74,15 +74,15 @@ public class WalletService {
         TransactionEntity transaction = new TransactionEntity()
                 .setUser(user)
                 .setWallet(wallet)
-                .setAmount(submitDTO.getAmount())
+                .setAmount(request.getAmount())
                 .setBalanceBefore(wallet.getBalance())
-                .setType(submitDTO.getType())
+                .setType(request.getType())
                 .setCreatedAt(Instant.now());
 
-        if (isWithinThreshold(submitDTO.getAmount())) {
+        if (isWithinThreshold(request.getAmount())) {
             transaction.setStatus(TransactionStatus.APPROVED);
-            transaction.setBalanceAfter(wallet.getBalance().add(getTransactionAmount(submitDTO.getType(), submitDTO.getAmount())));
-            wallet.setBalance(wallet.getBalance().add(getTransactionAmount(submitDTO.getType(), submitDTO.getAmount())));
+            transaction.setBalanceAfter(wallet.getBalance().add(getTransactionAmount(request.getType(), request.getAmount())));
+            wallet.setBalance(wallet.getBalance().add(getTransactionAmount(request.getType(), request.getAmount())));
         } else {
             transaction.setStatus(TransactionStatus.AWAITING_APPROVAL);
             transaction.setBalanceAfter(wallet.getBalance());
@@ -93,7 +93,7 @@ public class WalletService {
         walletRepository.save(wallet);
         transactionRepository.save(transaction);
 
-        return new TransactionDTO()
+        return new Transaction()
                 .setId(transaction.getId())
                 .setUserId(user.getId())
                 .setWalletId(wallet.getId())

@@ -2,8 +2,8 @@ package com.khantech.assignment.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.khantech.assignment.TestContainerConfiguration;
-import com.khantech.assignment.dto.CreateUserDTO;
-import com.khantech.assignment.dto.UserDTO;
+import com.khantech.assignment.dto.CreateUserRequest;
+import com.khantech.assignment.dto.User;
 import com.khantech.assignment.entity.UserEntity;
 import com.khantech.assignment.repository.TransactionRepository;
 import com.khantech.assignment.repository.UserRepository;
@@ -55,34 +55,34 @@ class UserControllerTest {
     @Test
     @DisplayName("Should create user successfully when all conditions are met")
     void testCreateUserSuccess() throws Exception {
-        CreateUserDTO requestDTO = new CreateUserDTO();
-        requestDTO.setName(TEST_USER_NAME);
+        CreateUserRequest request = new CreateUserRequest();
+        request.setName(TEST_USER_NAME);
 
         String jsonResp = mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(requestDTO)))
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andReturn().getResponse().getContentAsString();
 
-        UserDTO createdUser = objectMapper.readValue(jsonResp, UserDTO.class);
+        User createdUser = objectMapper.readValue(jsonResp, User.class);
         assertThat(createdUser.getId()).isNotNull();
-        assertThat(createdUser.getName()).isEqualTo(requestDTO.getName());
+        assertThat(createdUser.getName()).isEqualTo(request.getName());
 
         assertThat(userRepository.findAll()).hasSize(1);
         UserEntity userInDB = userRepository.findById(createdUser.getId()).orElseThrow();
-        assertThat(userInDB.getName()).isEqualTo(requestDTO.getName());
+        assertThat(userInDB.getName()).isEqualTo(request.getName());
     }
 
     @Test
     @DisplayName("Should not create user when name is blank")
     void testCreateUserNameBlank() throws Exception {
-        CreateUserDTO createUserDTO = new CreateUserDTO();
-        createUserDTO.setName(""); // Blank name
+        CreateUserRequest createUserRequest = new CreateUserRequest();
+        createUserRequest.setName(""); // Blank name
 
         mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(createUserDTO)))
+                        .content(objectMapper.writeValueAsString(createUserRequest)))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.validationErrors", hasSize(1)))

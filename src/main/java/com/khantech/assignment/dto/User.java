@@ -7,7 +7,7 @@ import java.util.UUID;
 
 @Data
 @Accessors(chain = true)
-public class UserDTO {
+public class User {
     private UUID id;
     private String name;
 }

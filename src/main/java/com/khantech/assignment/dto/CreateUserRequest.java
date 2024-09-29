@@ -6,7 +6,7 @@ import lombok.experimental.Accessors;
 
 @Data
 @Accessors(chain = true)
-public class CreateUserDTO {
+public class CreateUserRequest {
     @NotBlank
     private String name;
 }

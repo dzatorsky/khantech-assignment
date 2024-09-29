@@ -11,7 +11,7 @@ import java.util.UUID;
 
 @Data
 @Accessors(chain = true)
-public class TransactionDTO {
+public class Transaction {
     private UUID id;
 
     private UUID userId;

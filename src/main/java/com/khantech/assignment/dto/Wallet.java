@@ -8,7 +8,7 @@ import java.util.UUID;
 
 @Data
 @Accessors(chain = true)
-public class WalletDTO {
+public class Wallet {
     private UUID id;
 
     private UUID userId;

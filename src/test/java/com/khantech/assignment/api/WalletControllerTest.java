@@ -3,10 +3,10 @@ package com.khantech.assignment.api;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.khantech.assignment.TestContainerConfiguration;
 import com.khantech.assignment.config.AppProperties;
-import com.khantech.assignment.dto.CreateWalletDTO;
-import com.khantech.assignment.dto.SubmitTransactionDTO;
-import com.khantech.assignment.dto.TransactionDTO;
-import com.khantech.assignment.dto.WalletDTO;
+import com.khantech.assignment.dto.CreateWalletRequest;
+import com.khantech.assignment.dto.SubmitTransactionRequest;
+import com.khantech.assignment.dto.Transaction;
+import com.khantech.assignment.dto.Wallet;
 import com.khantech.assignment.entity.TransactionEntity;
 import com.khantech.assignment.entity.UserEntity;
 import com.khantech.assignment.entity.WalletEntity;
@@ -84,24 +84,24 @@ class WalletControllerTest {
         @Test
         @DisplayName("Should create wallet when all conditions are met")
         void testCreateWalletSuccess() throws Exception {
-            CreateWalletDTO createDTO = new CreateWalletDTO();
-            createDTO.setUserId(testUser.getId());
-            createDTO.setCurrency(TEST_CURRENCY);
+            CreateWalletRequest request = new CreateWalletRequest();
+            request.setUserId(testUser.getId());
+            request.setCurrency(TEST_CURRENCY);
 
             String jsonResp = mockMvc.perform(post("/api/wallets")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(createDTO)))
+                            .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isCreated())
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                     .andReturn().getResponse().getContentAsString();
 
             assertThat(walletRepository.findAll()).hasSize(1);
 
-            WalletDTO walletDTO = objectMapper.readValue(jsonResp, WalletDTO.class);
-            assertThat(walletDTO.getId()).isNotNull();
-            assertThat(walletDTO.getUserId()).isEqualByComparingTo(testUser.getId());
-            assertThat(walletDTO.getCurrency()).isEqualTo(TEST_CURRENCY);
-            assertThat(walletDTO.getBalance()).isEqualByComparingTo(BigDecimal.ZERO);
+            Wallet wallet = objectMapper.readValue(jsonResp, Wallet.class);
+            assertThat(wallet.getId()).isNotNull();
+            assertThat(wallet.getUserId()).isEqualByComparingTo(testUser.getId());
+            assertThat(wallet.getCurrency()).isEqualTo(TEST_CURRENCY);
+            assertThat(wallet.getBalance()).isEqualByComparingTo(BigDecimal.ZERO);
 
             WalletEntity walletInDB = walletRepository.findAll().getFirst();
             assertThat(walletInDB.getUser().getId()).isEqualByComparingTo(testUser.getId());
@@ -112,13 +112,13 @@ class WalletControllerTest {
         @Test
         @DisplayName("Should not create wallet when the user doesn't exist")
         void testCreateWalletUserNotFound() throws Exception {
-            CreateWalletDTO createWalletDTO = new CreateWalletDTO();
-            createWalletDTO.setUserId(UUID.randomUUID()); // Non-existent user ID
-            createWalletDTO.setCurrency(TEST_CURRENCY);
+            CreateWalletRequest request = new CreateWalletRequest();
+            request.setUserId(UUID.randomUUID()); // Non-existent user ID
+            request.setCurrency(TEST_CURRENCY);
 
             mockMvc.perform(post("/api/wallets")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(createWalletDTO)))
+                            .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isNotFound());
 
             assertThat(walletRepository.findAll()).isEmpty();
@@ -133,27 +133,27 @@ class WalletControllerTest {
             existingWallet.setBalance(BigDecimal.valueOf(10000L));
             walletRepository.save(existingWallet);
 
-            CreateWalletDTO createWalletDTO = new CreateWalletDTO();
-            createWalletDTO.setUserId(testUser.getId());
-            createWalletDTO.setCurrency(TEST_CURRENCY);
+            CreateWalletRequest request = new CreateWalletRequest();
+            request.setUserId(testUser.getId());
+            request.setCurrency(TEST_CURRENCY);
 
             mockMvc.perform(post("/api/wallets")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(createWalletDTO)))
+                            .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isConflict());
         }
 
         @Test
         @DisplayName("Should not create wallet when request validation fails")
         void testCreateWalletValidation() throws Exception {
-            CreateWalletDTO createWalletDTO = new CreateWalletDTO();
+            CreateWalletRequest request = new CreateWalletRequest();
 
             // Currency is blank
-            createWalletDTO.setCurrency("");
-            createWalletDTO.setUserId(testUser.getId());
+            request.setCurrency("");
+            request.setUserId(testUser.getId());
             mockMvc.perform(post("/api/wallets")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(createWalletDTO)))
+                            .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isBadRequest())
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                     .andExpect(jsonPath("$.validationErrors", hasSize(1)))
@@ -162,11 +162,11 @@ class WalletControllerTest {
                     .andExpect(jsonPath("$.validationErrors[0].rejectedValue").value(""));
 
             // Null userId
-            createWalletDTO.setUserId(null);
-            createWalletDTO.setCurrency("USD");
+            request.setUserId(null);
+            request.setCurrency("USD");
             mockMvc.perform(post("/api/wallets")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(createWalletDTO)))
+                            .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isBadRequest())
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                     .andExpect(jsonPath("$.validationErrors", hasSize(1)))
@@ -204,11 +204,11 @@ class WalletControllerTest {
         @Test
         @DisplayName("Should save transaction in DB with all the fields mapped properly without null values")
         void testSubmitCreditTransaction() throws Exception {
-            SubmitTransactionDTO submitDTO = new SubmitTransactionDTO()
+            SubmitTransactionRequest request = new SubmitTransactionRequest()
                     .setAmount(AMOUNT_WITHIN_THRESHOLD)
                     .setType(TransactionType.CREDIT);
 
-            TransactionDTO response = submitTransaction(submitDTO);
+            Transaction response = submitTransaction(request);
 
             assertThat(response.getId()).isNotNull();
             assertThat(response.getUserId()).isEqualByComparingTo(testUser.getId());
@@ -239,13 +239,13 @@ class WalletControllerTest {
         @Test
         @DisplayName("Should automatically add money to the user wallet for transactions under the threshold")
         void testCreditTransaction() throws Exception {
-            SubmitTransactionDTO submitDTO = new SubmitTransactionDTO()
+            SubmitTransactionRequest request = new SubmitTransactionRequest()
                     .setAmount(AMOUNT_WITHIN_THRESHOLD)
                     .setType(TransactionType.CREDIT);
 
             BigDecimal expectedBalance = TEST_BALANCE.add(AMOUNT_WITHIN_THRESHOLD);
 
-            TransactionDTO response = submitTransaction(submitDTO);
+            Transaction response = submitTransaction(request);
             verifyBalanceChange(response, expectedBalance);
 
             TransactionEntity transaction = transactionRepository.findById(response.getId()).orElseThrow();
@@ -255,13 +255,13 @@ class WalletControllerTest {
         @Test
         @DisplayName("Should automatically deduct money from the user wallet for transactions under the threshold")
         void testDebitTransaction() throws Exception {
-            SubmitTransactionDTO submitDTO = new SubmitTransactionDTO()
+            SubmitTransactionRequest request = new SubmitTransactionRequest()
                     .setAmount(AMOUNT_WITHIN_THRESHOLD)
                     .setType(TransactionType.DEBIT);
 
             BigDecimal expectedBalance = TEST_BALANCE.subtract(AMOUNT_WITHIN_THRESHOLD);
 
-            TransactionDTO response = submitTransaction(submitDTO);
+            Transaction response = submitTransaction(request);
             verifyBalanceChange(response, expectedBalance);
 
             TransactionEntity transaction = transactionRepository.findById(response.getId()).orElseThrow();
@@ -271,13 +271,13 @@ class WalletControllerTest {
         @Test
         @DisplayName("Should return error when wallet does not exist")
         void testSubmitTransactionWalletNotFound() throws Exception {
-            SubmitTransactionDTO submitDTO = new SubmitTransactionDTO()
+            SubmitTransactionRequest request = new SubmitTransactionRequest()
                     .setAmount(AMOUNT_WITHIN_THRESHOLD)
                     .setType(TransactionType.DEBIT);
 
             mockMvc.perform(post("/api/wallets/{walletId}/transactions", UUID.randomUUID())
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(submitDTO)))
+                            .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isNotFound());
 
             assertThat(transactionRepository.findAll()).isEmpty();
@@ -289,13 +289,13 @@ class WalletControllerTest {
             testWallet.setBalance(BigDecimal.ZERO);
             walletRepository.save(testWallet);
 
-            SubmitTransactionDTO submitDTO = new SubmitTransactionDTO()
+            SubmitTransactionRequest request = new SubmitTransactionRequest()
                     .setAmount(AMOUNT_WITHIN_THRESHOLD)
                     .setType(TransactionType.DEBIT);
 
             mockMvc.perform(post("/api/wallets/{walletId}/transactions", testWallet.getId())
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(submitDTO)))
+                            .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isBadRequest());
 
             assertThat(transactionRepository.findAll()).isEmpty();
@@ -307,13 +307,13 @@ class WalletControllerTest {
             testWallet.setBalance(BigDecimal.ZERO);
             walletRepository.save(testWallet);
 
-            SubmitTransactionDTO submitDTO = new SubmitTransactionDTO()
+            SubmitTransactionRequest request = new SubmitTransactionRequest()
                     .setAmount(AMOUNT_ABOVE_THRESHOLD)
                     .setType(TransactionType.DEBIT);
 
             mockMvc.perform(post("/api/wallets/{walletId}/transactions", testWallet.getId())
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(submitDTO)))
+                            .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isBadRequest());
 
             assertThat(transactionRepository.findAll()).isEmpty();
@@ -322,11 +322,11 @@ class WalletControllerTest {
         @Test
         @DisplayName("Should save transaction above threshold in AWAITING_APPROVAL status without changing wallet balance")
         void testSubmitTransactionWithoutBalanceChangeAboveTheThreshold() throws Exception {
-            SubmitTransactionDTO submitDTO = new SubmitTransactionDTO()
+            SubmitTransactionRequest request = new SubmitTransactionRequest()
                     .setAmount(AMOUNT_ABOVE_THRESHOLD)
                     .setType(TransactionType.DEBIT);
 
-            TransactionDTO response = submitTransaction(submitDTO);
+            Transaction response = submitTransaction(request);
 
             verifyBalanceChange(response, TEST_BALANCE);
 
@@ -334,18 +334,18 @@ class WalletControllerTest {
             assertThat(transaction.getStatus()).isEqualTo(TransactionStatus.AWAITING_APPROVAL);
         }
 
-        private TransactionDTO submitTransaction(SubmitTransactionDTO submitDTO) throws Exception {
+        private Transaction submitTransaction(SubmitTransactionRequest request) throws Exception {
             String jsonResp = mockMvc.perform(post("/api/wallets/{walletId}/transactions", testWallet.getId())
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(submitDTO)))
+                            .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isAccepted())
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                     .andReturn().getResponse().getContentAsString();
 
-            return objectMapper.readValue(jsonResp, TransactionDTO.class);
+            return objectMapper.readValue(jsonResp, Transaction.class);
         }
 
-        private void verifyBalanceChange(TransactionDTO response, BigDecimal expectedBalance) {
+        private void verifyBalanceChange(Transaction response, BigDecimal expectedBalance) {
             // CHeck if the response contains properly calculated fields
             assertThat(response.getBalanceBefore()).isEqualByComparingTo(TEST_BALANCE);
             assertThat(response.getBalanceAfter()).isEqualByComparingTo(expectedBalance);

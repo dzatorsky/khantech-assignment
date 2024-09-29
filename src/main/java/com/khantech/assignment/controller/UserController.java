@@ -1,7 +1,7 @@
 package com.khantech.assignment.controller;
 
-import com.khantech.assignment.dto.CreateUserDTO;
-import com.khantech.assignment.dto.UserDTO;
+import com.khantech.assignment.dto.CreateUserRequest;
+import com.khantech.assignment.dto.User;
 import com.khantech.assignment.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,8 +22,8 @@ public class UserController {
     private final UserService userService;
 
     @PostMapping
-    public ResponseEntity<UserDTO> createUser(@Valid @RequestBody CreateUserDTO dto) {
-        UserDTO createdUser = userService.createUser(dto);
+    public ResponseEntity<User> createUser(@Valid @RequestBody CreateUserRequest request) {
+        User createdUser = userService.createUser(request);
         return new ResponseEntity<>(createdUser, HttpStatus.CREATED);
     }
 
