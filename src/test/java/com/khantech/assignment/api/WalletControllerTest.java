@@ -12,6 +12,7 @@ import com.khantech.assignment.entity.UserEntity;
 import com.khantech.assignment.entity.WalletEntity;
 import com.khantech.assignment.enums.TransactionStatus;
 import com.khantech.assignment.enums.TransactionType;
+import com.khantech.assignment.error.dto.CommonErrorResponse;
 import com.khantech.assignment.repository.TransactionRepository;
 import com.khantech.assignment.repository.UserRepository;
 import com.khantech.assignment.repository.WalletRepository;
@@ -205,41 +206,24 @@ class WalletControllerTest {
         @DisplayName("Should save transaction in DB with all the fields mapped properly without null values")
         void testSubmitCreditTransaction() throws Exception {
             SubmitTransactionRequest request = new SubmitTransactionRequest()
+                    .setRequestId(UUID.randomUUID())
                     .setAmount(AMOUNT_WITHIN_THRESHOLD)
                     .setType(TransactionType.CREDIT);
 
             Transaction response = submitTransaction(request);
 
-            assertThat(response.getId()).isNotNull();
-            assertThat(response.getUserId()).isEqualByComparingTo(testUser.getId());
-            assertThat(response.getWalletId()).isEqualByComparingTo(testWallet.getId());
-            assertThat(response.getAmount()).isEqualByComparingTo(AMOUNT_WITHIN_THRESHOLD);
-            assertThat(response.getType()).isEqualTo(TransactionType.CREDIT);
-            assertThat(response.getBalanceBefore()).isEqualByComparingTo(TEST_BALANCE);
-            assertThat(response.getBalanceAfter()).isEqualByComparingTo(TEST_BALANCE.add(AMOUNT_WITHIN_THRESHOLD));
-            assertThat(response.getStatus()).isEqualTo(TransactionStatus.APPROVED);
-            assertThat(response.getCreatedAt()).isNotNull();
-
-            assertThat(response).hasNoNullFieldsOrProperties();
+            assertResponseFields(response);
 
             assertThat(transactionRepository.findAll()).hasSize(1);
             TransactionEntity savedTransaction = transactionRepository.findAll().getFirst();
-            assertThat(savedTransaction.getId()).isNotNull();
-            assertThat(savedTransaction.getUser().getId()).isEqualByComparingTo(testUser.getId());
-            assertThat(savedTransaction.getAmount()).isEqualByComparingTo(AMOUNT_WITHIN_THRESHOLD);
-            assertThat(savedTransaction.getType()).isEqualTo(TransactionType.CREDIT);
-            assertThat(savedTransaction.getBalanceBefore()).isEqualByComparingTo(TEST_BALANCE);
-            assertThat(savedTransaction.getBalanceAfter()).isEqualByComparingTo(TEST_BALANCE.add(AMOUNT_WITHIN_THRESHOLD));
-            assertThat(savedTransaction.getStatus()).isEqualTo(TransactionStatus.APPROVED);
-            assertThat(savedTransaction.getCreatedAt()).isNotNull();
-
-            assertThat(savedTransaction).hasNoNullFieldsOrProperties();
+            assertEntityFields(savedTransaction);
         }
 
         @Test
         @DisplayName("Should automatically add money to the user wallet for transactions under the threshold")
         void testCreditTransaction() throws Exception {
             SubmitTransactionRequest request = new SubmitTransactionRequest()
+                    .setRequestId(UUID.randomUUID())
                     .setAmount(AMOUNT_WITHIN_THRESHOLD)
                     .setType(TransactionType.CREDIT);
 
@@ -256,6 +240,7 @@ class WalletControllerTest {
         @DisplayName("Should automatically deduct money from the user wallet for transactions under the threshold")
         void testDebitTransaction() throws Exception {
             SubmitTransactionRequest request = new SubmitTransactionRequest()
+                    .setRequestId(UUID.randomUUID())
                     .setAmount(AMOUNT_WITHIN_THRESHOLD)
                     .setType(TransactionType.DEBIT);
 
@@ -269,9 +254,37 @@ class WalletControllerTest {
         }
 
         @Test
+        @DisplayName("Should return error when requestId is duplicated")
+        void testSubmitTransactioWhenRequestIdDuplicated() throws Exception {
+            UUID requestId = UUID.randomUUID();
+
+            SubmitTransactionRequest request = new SubmitTransactionRequest()
+                    .setRequestId(requestId)
+                    .setAmount(AMOUNT_WITHIN_THRESHOLD)
+                    .setType(TransactionType.DEBIT);
+
+            mockMvc.perform(post("/api/wallets/{walletId}/transactions", testWallet.getId())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isAccepted());
+
+            String resp = mockMvc.perform(post("/api/wallets/{walletId}/transactions", testWallet.getId())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isConflict())
+                    .andReturn().getResponse().getContentAsString();
+
+            CommonErrorResponse response = objectMapper.readValue(resp, CommonErrorResponse.class);
+            assertThat(response.getCode()).isEqualTo("duplicated-transaction");
+
+            assertThat(transactionRepository.findAll()).hasSize(1);
+        }
+
+        @Test
         @DisplayName("Should return error when wallet does not exist")
         void testSubmitTransactionWalletNotFound() throws Exception {
             SubmitTransactionRequest request = new SubmitTransactionRequest()
+                    .setRequestId(UUID.randomUUID())
                     .setAmount(AMOUNT_WITHIN_THRESHOLD)
                     .setType(TransactionType.DEBIT);
 
@@ -290,6 +303,7 @@ class WalletControllerTest {
             walletRepository.save(testWallet);
 
             SubmitTransactionRequest request = new SubmitTransactionRequest()
+                    .setRequestId(UUID.randomUUID())
                     .setAmount(AMOUNT_WITHIN_THRESHOLD)
                     .setType(TransactionType.DEBIT);
 
@@ -308,6 +322,7 @@ class WalletControllerTest {
             walletRepository.save(testWallet);
 
             SubmitTransactionRequest request = new SubmitTransactionRequest()
+                    .setRequestId(UUID.randomUUID())
                     .setAmount(AMOUNT_ABOVE_THRESHOLD)
                     .setType(TransactionType.DEBIT);
 
@@ -323,6 +338,7 @@ class WalletControllerTest {
         @DisplayName("Should save transaction above threshold in AWAITING_APPROVAL status without changing wallet balance")
         void testSubmitTransactionWithoutBalanceChangeAboveTheThreshold() throws Exception {
             SubmitTransactionRequest request = new SubmitTransactionRequest()
+                    .setRequestId(UUID.randomUUID())
                     .setAmount(AMOUNT_ABOVE_THRESHOLD)
                     .setType(TransactionType.DEBIT);
 
@@ -332,6 +348,33 @@ class WalletControllerTest {
 
             TransactionEntity transaction = transactionRepository.findById(response.getId()).orElseThrow();
             assertThat(transaction.getStatus()).isEqualTo(TransactionStatus.AWAITING_APPROVAL);
+        }
+
+        private void assertEntityFields(TransactionEntity savedTransaction) {
+            assertThat(savedTransaction.getId()).isNotNull();
+            assertThat(savedTransaction.getUser().getId()).isEqualByComparingTo(testUser.getId());
+            assertThat(savedTransaction.getAmount()).isEqualByComparingTo(AMOUNT_WITHIN_THRESHOLD);
+            assertThat(savedTransaction.getType()).isEqualTo(TransactionType.CREDIT);
+            assertThat(savedTransaction.getBalanceBefore()).isEqualByComparingTo(TEST_BALANCE);
+            assertThat(savedTransaction.getBalanceAfter()).isEqualByComparingTo(TEST_BALANCE.add(AMOUNT_WITHIN_THRESHOLD));
+            assertThat(savedTransaction.getStatus()).isEqualTo(TransactionStatus.APPROVED);
+            assertThat(savedTransaction.getCreatedAt()).isNotNull();
+
+            assertThat(savedTransaction).hasNoNullFieldsOrProperties();
+        }
+
+        private void assertResponseFields(Transaction response) {
+            assertThat(response.getId()).isNotNull();
+            assertThat(response.getUserId()).isEqualByComparingTo(testUser.getId());
+            assertThat(response.getWalletId()).isEqualByComparingTo(testWallet.getId());
+            assertThat(response.getAmount()).isEqualByComparingTo(AMOUNT_WITHIN_THRESHOLD);
+            assertThat(response.getType()).isEqualTo(TransactionType.CREDIT);
+            assertThat(response.getBalanceBefore()).isEqualByComparingTo(TEST_BALANCE);
+            assertThat(response.getBalanceAfter()).isEqualByComparingTo(TEST_BALANCE.add(AMOUNT_WITHIN_THRESHOLD));
+            assertThat(response.getStatus()).isEqualTo(TransactionStatus.APPROVED);
+            assertThat(response.getCreatedAt()).isNotNull();
+
+            assertThat(response).hasNoNullFieldsOrProperties();
         }
 
         private Transaction submitTransaction(SubmitTransactionRequest request) throws Exception {

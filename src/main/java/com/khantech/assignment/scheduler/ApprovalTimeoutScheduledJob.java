@@ -20,8 +20,10 @@ public class ApprovalTimeoutScheduledJob {
     @Scheduled(cron = "${app.scheduler.approval-timeout-job.cron}")
     public void approveExpiredTransactions() {
         log.info("Scheduled Job for approving expired transactions started.");
+
         Integer batchSize = appProperties.getScheduler().getApprovalTimeoutJob().getBatchSize();
         walletService.rejectExpiredTransactions(batchSize);
+
         log.info("Scheduled Job for approving expired transactions finished.");
     }
 }

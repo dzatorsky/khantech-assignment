@@ -171,6 +171,7 @@ class AdminControllerTest {
 
         private TransactionEntity getTestTransaction() {
             return new TransactionEntity()
+                    .setRequestId(UUID.randomUUID())
                     .setUser(testUser)
                     .setWallet(testWallet)
                     .setAmount(TEST_TRANSACTION_AMOUNT)

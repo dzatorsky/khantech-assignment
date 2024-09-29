@@ -14,6 +14,8 @@ import java.util.UUID;
 public class Transaction {
     private UUID id;
 
+    private UUID requestId;
+
     private UUID userId;
 
     private UUID walletId;

@@ -23,6 +23,7 @@ import org.springframework.context.annotation.Import;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
@@ -176,15 +177,17 @@ class ApprovalTimeoutScheduledJobTest {
     }
 
     private TransactionEntity saveTransaction(TransactionStatus status, Instant now) {
-        TransactionEntity testTransaction = new TransactionEntity();
-        testTransaction.setUser(testUser);
-        testTransaction.setWallet(testWallet);
-        testTransaction.setAmount(BigDecimal.valueOf(1000));
-        testTransaction.setType(TransactionType.DEBIT);
-        testTransaction.setStatus(status);
-        testTransaction.setBalanceBefore(BigDecimal.ZERO);
-        testTransaction.setBalanceAfter(BigDecimal.valueOf(1000));
-        testTransaction.setCreatedAt(now);
+        TransactionEntity testTransaction = new TransactionEntity()
+                .setRequestId(UUID.randomUUID()) // Not important for this test
+                .setUser(testUser)
+                .setWallet(testWallet)
+                .setAmount(BigDecimal.valueOf(1000))
+                .setType(TransactionType.DEBIT)
+                .setStatus(status)
+                .setBalanceBefore(BigDecimal.ZERO)
+                .setBalanceAfter(BigDecimal.valueOf(1000))
+                .setCreatedAt(now);
+
         return transactionRepository.save(testTransaction);
     }
 

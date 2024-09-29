@@ -69,9 +69,16 @@ public class WalletService {
                 .findById(walletId)
                 .orElseThrow(() -> new WalletNotFoundException(walletId));
 
+        transactionRepository
+                .findByRequestId(request.getRequestId())
+                .ifPresent(transaction -> {
+                    throw new DuplicatedTransactionException(transaction.getRequestId());
+                });
+
         UserEntity user = wallet.getUser();
 
         TransactionEntity transaction = new TransactionEntity()
+                .setRequestId(request.getRequestId())
                 .setUser(user)
                 .setWallet(wallet)
                 .setAmount(request.getAmount())
@@ -95,6 +102,7 @@ public class WalletService {
 
         return new Transaction()
                 .setId(transaction.getId())
+                .setRequestId(transaction.getRequestId())
                 .setUserId(user.getId())
                 .setWalletId(wallet.getId())
                 .setAmount(transaction.getAmount())

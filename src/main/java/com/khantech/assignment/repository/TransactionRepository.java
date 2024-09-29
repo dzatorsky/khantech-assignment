@@ -8,9 +8,12 @@ import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface TransactionRepository extends JpaRepository<TransactionEntity, UUID> {
     List<TransactionEntity> findAllByStatusAndCreatedAtBefore(TransactionStatus status, Instant timeoutDate, Pageable pageable);
+
+    Optional<TransactionEntity> findByRequestId(UUID requestId);
 }
