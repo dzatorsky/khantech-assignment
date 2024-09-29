@@ -10,10 +10,7 @@ import com.khantech.assignment.entity.UserEntity;
 import com.khantech.assignment.entity.WalletEntity;
 import com.khantech.assignment.enums.TransactionStatus;
 import com.khantech.assignment.enums.TransactionType;
-import com.khantech.assignment.error.InsufficientFundsException;
-import com.khantech.assignment.error.UserNotFoundException;
-import com.khantech.assignment.error.WalletAlreadyExistsException;
-import com.khantech.assignment.error.WalletNotFoundException;
+import com.khantech.assignment.error.*;
 import com.khantech.assignment.repository.TransactionRepository;
 import com.khantech.assignment.repository.UserRepository;
 import com.khantech.assignment.repository.WalletRepository;
@@ -68,12 +65,6 @@ public class WalletService {
                 .findById(walletId)
                 .orElseThrow(() -> new WalletNotFoundException(walletId));
 
-        if (submitDTO.getType() == TransactionType.DEBIT) {
-            if (wallet.getBalance().compareTo(submitDTO.getAmount()) < 0) {
-                throw new InsufficientFundsException(walletId, wallet.getBalance(), submitDTO.getAmount());
-            }
-        }
-
         UserEntity user = wallet.getUser();
 
         TransactionEntity transaction = new TransactionEntity()
@@ -86,12 +77,14 @@ public class WalletService {
 
         if (isWithinThreshold(submitDTO.getAmount())) {
             transaction.setStatus(TransactionStatus.APPROVED);
-            transaction.setBalanceAfter(wallet.getBalance().add(getTransactionAmount(submitDTO)));
-            wallet.setBalance(wallet.getBalance().add(getTransactionAmount(submitDTO)));
+            transaction.setBalanceAfter(wallet.getBalance().add(getTransactionAmount(submitDTO.getType(), submitDTO.getAmount())));
+            wallet.setBalance(wallet.getBalance().add(getTransactionAmount(submitDTO.getType(), submitDTO.getAmount())));
         } else {
             transaction.setStatus(TransactionStatus.AWAITING_APPROVAL);
             transaction.setBalanceAfter(wallet.getBalance());
         }
+
+        verifyEnoughBalance(wallet);
 
         walletRepository.save(wallet);
         transactionRepository.save(transaction);
@@ -108,16 +101,48 @@ public class WalletService {
                 .setCreatedAt(transaction.getCreatedAt());
     }
 
+    public void approveTransaction(UUID transactionId) {
+        TransactionEntity transaction = this.transactionRepository
+                .findById(transactionId)
+                .orElseThrow(() -> new TransactionNotFoundException(transactionId));
+
+        if (transaction.getStatus() == TransactionStatus.AWAITING_APPROVAL) {
+            WalletEntity wallet = transaction.getWallet();
+
+            transaction.setStatus(TransactionStatus.APPROVED);
+            transaction.setBalanceBefore(wallet.getBalance());
+
+            BigDecimal transactionAmount = getTransactionAmount(transaction.getType(), transaction.getAmount());
+            BigDecimal newBalance = wallet.getBalance().add(transactionAmount);
+
+            wallet.setBalance(newBalance);
+            transaction.setBalanceAfter(newBalance);
+
+            verifyEnoughBalance(wallet);
+
+            walletRepository.save(wallet);
+            transactionRepository.save(transaction);
+        } else {
+            throw new InvalidTransactionStateException(transactionId, transaction.getStatus(), TransactionStatus.AWAITING_APPROVAL);
+        }
+    }
+
     private boolean isWithinThreshold(BigDecimal amount) {
         BigDecimal threshold = appProperties.getWallet().getTransaction().getThreshold();
         return threshold.compareTo(amount) > 0;
     }
 
-    private static BigDecimal getTransactionAmount(SubmitTransactionDTO submitDTO) {
-        BigDecimal transactionAmount = submitDTO.getAmount();
-        if (submitDTO.getType() == TransactionType.DEBIT) {
-            transactionAmount = transactionAmount.negate();
+    private BigDecimal getTransactionAmount(TransactionType transactionType, BigDecimal transactionAmount) {
+        BigDecimal amount = transactionAmount;
+        if (transactionType == TransactionType.DEBIT) {
+            amount = transactionAmount.negate();
         }
-        return transactionAmount;
+        return amount;
+    }
+
+    private void verifyEnoughBalance(WalletEntity wallet) {
+        if (wallet.getBalance().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new InsufficientFundsException(wallet.getId(), wallet.getBalance());
+        }
     }
 }
