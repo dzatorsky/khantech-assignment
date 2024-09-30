@@ -26,14 +26,6 @@ public class CommonException extends RuntimeException {
 
     private List<ValidationError> validationErrors;
 
-    /**
-     * This constructor is "protected" on purpose. For custom errors please extend this exception and create your own.
-     * This is needed for automatic documentation generation purposes.
-     *
-     * @param code    The code of the error. Should not be changed. It will be used by front-end for the error localization.
-     * @param message Default error message in case there is missing localization on front-end side.
-     * @param status  HTTP status code.
-     */
     protected CommonException(String code, String message, HttpStatus status) {
         this.code = code;
         this.message = message;

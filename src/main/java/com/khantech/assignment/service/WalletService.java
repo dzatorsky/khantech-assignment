@@ -9,7 +9,10 @@ import com.khantech.assignment.entity.TransactionEntity;
 import com.khantech.assignment.entity.UserEntity;
 import com.khantech.assignment.entity.WalletEntity;
 import com.khantech.assignment.enums.TransactionStatus;
-import com.khantech.assignment.error.*;
+import com.khantech.assignment.error.TransactionNotFoundException;
+import com.khantech.assignment.error.UserNotFoundException;
+import com.khantech.assignment.error.WalletAlreadyExistsException;
+import com.khantech.assignment.error.WalletNotFoundException;
 import com.khantech.assignment.repository.TransactionRepository;
 import com.khantech.assignment.repository.UserRepository;
 import com.khantech.assignment.repository.WalletRepository;
@@ -44,7 +47,6 @@ public class WalletService {
     private final List<ApproveTransactionHandler> approveTransactionHandlers;
 
     public Wallet createWallet(CreateWalletRequest request) {
-
         UserEntity user = this.userRepository
                 .findById(request.getUserId())
                 .orElseThrow(() -> new UserNotFoundException(request.getUserId()));
@@ -101,7 +103,7 @@ public class WalletService {
                 .setCreatedAt(transaction.getCreatedAt());
     }
 
-    public void approveTransaction(UUID transactionId) {
+    public Transaction approveTransaction(UUID transactionId) {
         TransactionEntity transaction = this.transactionRepository
                 .findById(transactionId)
                 .orElseThrow(() -> new TransactionNotFoundException(transactionId));
@@ -110,6 +112,18 @@ public class WalletService {
 
         walletRepository.save(transaction.getWallet());
         transactionRepository.save(transaction);
+
+        return new Transaction()
+                .setId(transaction.getId())
+                .setRequestId(transaction.getRequestId())
+                .setUserId(transaction.getUser().getId())
+                .setWalletId(transaction.getWallet().getId())
+                .setAmount(transaction.getAmount())
+                .setType(transaction.getType())
+                .setBalanceBefore(transaction.getBalanceBefore())
+                .setBalanceAfter(transaction.getBalanceAfter())
+                .setStatus(transaction.getStatus())
+                .setCreatedAt(transaction.getCreatedAt());
     }
 
     public void rejectExpiredTransactions(Integer batchSize) {
@@ -120,17 +134,17 @@ public class WalletService {
         List<TransactionEntity> rejectedTransactions = this.transactionRepository
                 .findAllByStatusAndCreatedAtBefore(TransactionStatus.AWAITING_APPROVAL, expirationDate, pageable)
                 .stream()
-                .map(transaction -> {
-                    if (transaction.getStatus() == TransactionStatus.AWAITING_APPROVAL) {
-                        transaction.setStatus(TransactionStatus.REJECTED);
-                        return transaction;
-                    } else {
-                        throw new InvalidTransactionStateException(transaction.getId(), transaction.getStatus(), TransactionStatus.AWAITING_APPROVAL);
-                    }
+                .peek(transaction -> {
+                    transaction.setStatus(TransactionStatus.REJECTED);
+                    log.info("Rejecting transaction with id {} due to manual approval expiration", transaction.getId());
                 })
                 .toList();
 
         transactionRepository.saveAll(rejectedTransactions);
+
+        if (!rejectedTransactions.isEmpty()) {
+            log.info("Rejected {} transactions in status {}", rejectedTransactions.size(), TransactionStatus.AWAITING_APPROVAL);
+        }
     }
 
 }

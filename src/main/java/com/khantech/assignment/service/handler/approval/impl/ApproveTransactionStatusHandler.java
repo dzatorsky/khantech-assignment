@@ -7,9 +7,11 @@ import com.khantech.assignment.service.handler.approval.ApproveTransactionContex
 import com.khantech.assignment.service.handler.approval.ApproveTransactionHandler;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
+import org.springframework.core.annotation.Order;
+import org.springframework.stereotype.Component;
 
-@Service
+@Order(2)
+@Component
 @Transactional
 @RequiredArgsConstructor
 public class ApproveTransactionStatusHandler implements ApproveTransactionHandler {

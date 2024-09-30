@@ -26,9 +26,13 @@ public class TestContainerConfiguration {
                 .withPassword("khantech")
                 .withLogConsumer(new Slf4jLogConsumer(log))
                 .withReuse(true)
-                .withCreateContainerCmdModifier(cmd -> cmd.withHostConfig(
-                        new HostConfig().withPortBindings(new PortBinding(Ports.Binding.bindPort(15432), new ExposedPort(5432)))
-                ));
+                .withCreateContainerCmdModifier(cmd ->
+                {
+                    PortBinding portBinding = new PortBinding(Ports.Binding.bindPort(15432), new ExposedPort(5432));
+                    cmd
+                            .withHostConfig(new HostConfig().withPortBindings(portBinding))
+                            .withName("knantech-postgres");
+                });
     }
 
 }

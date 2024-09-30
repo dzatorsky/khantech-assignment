@@ -8,9 +8,11 @@ import com.khantech.assignment.service.handler.submission.SubmitTransactionConte
 import com.khantech.assignment.service.handler.submission.SubmitTransactionHandler;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
+import org.springframework.core.annotation.Order;
+import org.springframework.stereotype.Component;
 
-@Service
+@Order(2)
+@Component
 @Transactional
 @RequiredArgsConstructor
 public class SubmitTransactionBalanceHandler implements SubmitTransactionHandler {

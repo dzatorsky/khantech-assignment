@@ -1,5 +1,6 @@
 package com.khantech.assignment.controller;
 
+import com.khantech.assignment.dto.Transaction;
 import com.khantech.assignment.service.WalletService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,8 +20,8 @@ public class AdminController {
     private final WalletService walletService;
 
     @PostMapping("/{transactionId}/approve")
-    public void approveTransaction(@PathVariable UUID transactionId) {
-        walletService.approveTransaction(transactionId);
+    public Transaction approveTransaction(@PathVariable UUID transactionId) {
+        return walletService.approveTransaction(transactionId);
     }
 
 }

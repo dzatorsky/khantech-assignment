@@ -10,11 +10,13 @@ import com.khantech.assignment.service.handler.submission.SubmitTransactionConte
 import com.khantech.assignment.service.handler.submission.SubmitTransactionHandler;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
+import org.springframework.core.annotation.Order;
+import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 
-@Service
+@Order(3)
+@Component
 @Transactional
 @RequiredArgsConstructor
 public class SubmitTransactionApprovalHandler implements SubmitTransactionHandler {

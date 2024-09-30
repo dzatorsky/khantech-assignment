@@ -11,6 +11,15 @@ spring:
     username: khantech
     password: khantech
 
+springdoc:
+  swagger-ui:
+    display-request-duration: true
+    disable-swagger-default-url: true
+    use-root-path: false
+    path: /docs
+    tags-sorter: alpha
+  show-actuator: false
+
 app:
   wallet:
     transaction:

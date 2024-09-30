@@ -8,11 +8,13 @@ import com.khantech.assignment.service.handler.approval.ApproveTransactionContex
 import com.khantech.assignment.service.handler.approval.ApproveTransactionHandler;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
+import org.springframework.core.annotation.Order;
+import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 
-@Service
+@Order(1)
+@Component
 @Transactional
 @RequiredArgsConstructor
 public class ApproveTransactionBalanceHandler implements ApproveTransactionHandler {
